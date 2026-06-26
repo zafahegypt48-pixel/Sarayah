@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  --ink: #16241c;
+  --ivory: #fbf7ef;
+  --brass: #c9a05c;
+  --brass-deep: #a9803f;
+  --emerald: #234d3a;
+  --line: #e4ddcf;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-ivory: var(--ivory);
+  --color-brass: var(--brass);
+  --color-brass-deep: var(--brass-deep);
+  --color-emerald: var(--emerald);
+  --font-display: var(--font-fraunces);
+  --font-sans: var(--font-worksans);
+}
+
+body {
+  background: var(--ivory);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}
+
+/* Signature element: pointed-arch image mask, echoing Egyptian venue architecture */
+.arch-mask {
+  clip-path: path("M0,260 L0,90 C0,40 40,0 100,0 C160,0 200,40 200,90 L200,260 Z");
+}
+
+.arch-mask-lg {
+  clip-path: path("M0,520 L0,170 C0,75 80,0 200,0 C320,0 400,75 400,170 L400,520 Z");
+}
