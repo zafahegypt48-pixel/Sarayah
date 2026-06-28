@@ -105,9 +105,26 @@ export default function SettingsPage() {
         <div className="flex gap-2">
           {[["en", "English"], ["ar", "العربية"]].map(([code, name]) => (
             <button key={code} onClick={() => setLocale(code)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold border transition ${locale === code ? "bg-emerald text-onnight border-emerald" : "border-hair text-cream/70 hover:border-emerald/50"}`}>
+              className={`px-4 py-2 rounded-full text-sm font-semibold border transition active:scale-[0.97] ${locale === code ? "bg-emerald text-onnight border-emerald" : "border-hair text-cream/70 hover:border-emerald/50"}`}>
               {name}
             </button>
+          ))}
+        </div>
+      </Section>
+
+      {/* Help & support */}
+      <Section label={s.help}>
+        <div className="flex flex-col text-sm">
+          {[
+            ["/support", t.nav.support],
+            ["/contact", t.footer.contact],
+            ["/add-venue", t.nav.listVenue],
+            ["/faq", t.footer.faq],
+          ].map(([href, label]) => (
+            <Link key={href} href={href} className="text-cream py-2.5 border-b border-hair last:border-0 hover:text-emerald transition flex items-center justify-between">
+              {label}
+              <span className="text-cream/30 rtl:-scale-x-100">›</span>
+            </Link>
           ))}
         </div>
       </Section>

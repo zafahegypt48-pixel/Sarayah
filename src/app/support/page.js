@@ -75,13 +75,19 @@ export default function SupportPage() {
       <div className="bg-surface border border-hair rounded-2xl flex flex-col h-[68vh]">
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.map((m, i) => (
-            <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div key={i} className={`flex animate-fade-up ${m.role === "user" ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap ${m.role === "user" ? "bg-emerald text-onnight" : "bg-canvas border border-hair text-cream/90"}`}>
                 {m.content}
               </div>
             </div>
           ))}
-          {sending && <div className="flex justify-start"><div className="bg-canvas border border-hair rounded-2xl px-4 py-2.5 text-sm text-cream/50">{ts.thinking}</div></div>}
+          {sending && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="bg-canvas border border-hair rounded-2xl px-4 py-3.5 text-cream/50 flex items-center gap-1.5" aria-label={ts.thinking}>
+                <span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" />
+              </div>
+            </div>
+          )}
 
           {/* Suggestion chips (only before the first question) */}
           {messages.length === 1 && (

@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 import { useI18n } from "@/lib/i18n/client";
 
 const CITIES = ["Cairo", "Giza", "New Cairo"];
@@ -7,12 +8,36 @@ const EVENTS = ["Wedding", "Engagement", "Birthday", "Corporate Event"];
 
 export default function FilterSidebar({ filters, onChange }) {
   const { t, tv } = useI18n();
+  const [open, setOpen] = useState(false); // mobile collapse state
   function set(key, value) {
     onChange({ ...filters, [key]: value });
   }
 
+  // Count active filters (for the mobile toggle badge).
+  const activeCount = Object.values(filters || {}).filter((v) => v !== "" && v != null && v !== false).length;
+
   return (
-    <aside className="bg-surface border border-hair rounded-2xl p-5 space-y-6 sticky top-24">
+    // NOTE: sticky ONLY on lg+. On mobile a sticky aside inside the page grid
+    // pins itself over the cards below it — that was the "cards clashing with
+    // filters" bug. On mobile it's a normal card the cards sit cleanly below.
+    <aside className="relative z-10 bg-surface border border-hair rounded-2xl p-5 lg:space-y-6 lg:sticky lg:top-24 self-start">
+      {/* Mobile-only collapse header */}
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+        className="lg:hidden w-full flex items-center justify-between gap-2 text-cream font-semibold"
+      >
+        <span className="flex items-center gap-2">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M4 6h16M7 12h10M10 18h4" /></svg>
+          {t.filters.title}
+          {activeCount > 0 && <span className="text-[11px] font-bold bg-emerald text-onnight rounded-full px-2 py-0.5">{activeCount}</span>}
+        </span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`w-4 h-4 transition-transform duration-300 ${open ? "rotate-180" : ""}`}><path d="M6 9l6 6 6-6" /></svg>
+      </button>
+
+      {/* Filter body — always visible on lg, toggled on mobile */}
+      <div className={`${open ? "block mt-5" : "hidden"} lg:block space-y-6`}>
       <div>
         <h3 className="text-sm font-semibold text-cream mb-3">{t.filters.cityArea}</h3>
         <select
@@ -121,6 +146,7 @@ export default function FilterSidebar({ filters, onChange }) {
       >
         {t.filters.clearAll}
       </button>
+      </div>
     </aside>
   );
 }

@@ -61,9 +61,10 @@ export default function FavoriteButton({ listingId, size = "md", className = "" 
       disabled={busy}
       aria-label={fav ? t.fav.remove : t.fav.add}
       title={fav ? t.fav.remove : t.fav.add}
-      className={`inline-flex items-center justify-center rounded-full bg-canvas/90 backdrop-blur shadow-sm hover:bg-canvas transition disabled:opacity-60 ${dim} ${fav ? "text-red-500" : "text-cream/50"} ${className}`}
+      className={`inline-flex items-center justify-center rounded-full bg-canvas/90 backdrop-blur shadow-sm hover:bg-canvas hover:scale-110 active:scale-95 transition disabled:opacity-60 ${dim} ${fav ? "text-red-500" : "text-cream/50"} ${className}`}
     >
-      {fav ? "♥" : "♡"}
+      {/* key forces a remount so the pop animation replays on each toggle to favorited */}
+      <span key={fav ? "on" : "off"} className={fav ? "animate-pop" : ""}>{fav ? "♥" : "♡"}</span>
     </button>
   );
 }

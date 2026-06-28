@@ -119,7 +119,7 @@ export default async function VenueDetailsPage({ params }) {
 
         {/* Sticky lead form */}
         <div>
-          <div className="sticky top-24 bg-surface border border-hair rounded-2xl p-6">
+          <div id="inquiry" className="sticky top-24 bg-surface border border-hair rounded-2xl p-6 scroll-mt-24">
             <p className="text-sm text-cream/50 mb-1">{t.detail.startingPrice}</p>
             <p className="font-display text-2xl text-emerald mb-5">{venue.startingPrice.toLocaleString()} EGP</p>
             <h3 className="font-semibold text-cream mb-4">{t.detail.sendInquiryTitle}</h3>

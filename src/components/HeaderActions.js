@@ -61,7 +61,7 @@ export default function HeaderActions() {
         {open && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} aria-hidden="true" />
-            <div className="absolute end-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-canvas border border-hair rounded-2xl shadow-lg z-50 overflow-hidden">
+            <div className="absolute end-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-canvas border border-hair rounded-2xl shadow-lg z-50 overflow-hidden animate-dropdown-in">
               <div className="px-4 py-3 border-b border-hair flex items-center justify-between gap-2">
                 <span className="font-semibold text-cream text-sm">
                   {tn.title}

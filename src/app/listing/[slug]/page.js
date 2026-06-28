@@ -174,7 +174,7 @@ export default async function ListingDetailPage({ params }) {
 
         {/* Sticky inquiry */}
         <div>
-          <div className="sticky top-24 bg-surface border border-hair rounded-2xl p-6">
+          <div id="inquiry" className="sticky top-24 bg-surface border border-hair rounded-2xl p-6 scroll-mt-24">
             <div className="flex items-start justify-between gap-3 mb-1">
               <p className="text-sm text-cream/50">{t.marketplace.startingPrice}</p>
               <FavoriteButton listingId={listing.id} size="lg" />

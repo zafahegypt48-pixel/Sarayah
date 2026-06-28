@@ -75,12 +75,12 @@ export default function VenuesPage() {
         <h1 className="font-display text-3xl text-cream">{t.venues.title}</h1>
         <p className="text-cream/60 mt-1">{countLabel}</p>
       </div>
-      <div className="grid lg:grid-cols-[280px_1fr] gap-8">
+      <div className="grid lg:grid-cols-[280px_1fr] gap-8 lg:items-start">
         <FilterSidebar filters={filters} onChange={setFilters} />
         <div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 content-start">
             {loading && venues.length === 0 && [...Array(6)].map((_, i) => (
-              <div key={i} className="bg-surface border border-hair rounded-2xl overflow-hidden animate-pulse">
+              <div key={i} className="bg-surface border border-hair rounded-2xl overflow-hidden skeleton">
                 <div className="h-48 bg-hair/60" />
                 <div className="p-4 space-y-3">
                   <div className="h-4 bg-hair/60 rounded w-3/4" />
@@ -92,7 +92,11 @@ export default function VenuesPage() {
             {!loading && error && (
               <p className="text-red-600 col-span-full text-center py-16">{error}</p>
             )}
-            {!error && venues.map((v) => <VenueCard key={v.id} venue={v} />)}
+            {!error && venues.map((v, i) => (
+              <div key={v.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}>
+                <VenueCard venue={v} />
+              </div>
+            ))}
             {!loading && !error && venues.length === 0 && (
               <p className="text-cream/50 col-span-full text-center py-16">{t.venues.empty}</p>
             )}

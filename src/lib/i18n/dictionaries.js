@@ -113,7 +113,6 @@ const en = {
     ],
     trust: [
       { strong: "Across Egypt", rest: "wedding & event venues" },
-      { strong: "Handpicked", rest: "& reviewed before listing" },
       { strong: "One inquiry", rest: "instead of a dozen calls" },
     ],
     featuredEyebrow: "Featured",
@@ -136,6 +135,7 @@ const en = {
   },
 
   filters: {
+    title: "Filters",
     cityArea: "City / Area",
     allCities: "All cities",
     venueType: "Venue type",
@@ -763,7 +763,6 @@ const ar = {
     ],
     trust: [
       { strong: "في كل مصر", rest: "أماكن أفراح ومناسبات" },
-      { strong: "منتقاة", rest: "ومراجَعة قبل النشر" },
       { strong: "طلب واحد", rest: "بدلًا من عشرات المكالمات" },
     ],
     featuredEyebrow: "مميّزة",
@@ -786,6 +785,7 @@ const ar = {
   },
 
   filters: {
+    title: "الفلاتر",
     cityArea: "المدينة / المنطقة",
     allCities: "كل المدن",
     venueType: "نوع المكان",

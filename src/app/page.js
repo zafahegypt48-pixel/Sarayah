@@ -1,6 +1,7 @@
 import Link from "next/link";
 import VenueCard from "@/components/VenueCard";
 import CategoryGrid from "@/components/CategoryGrid";
+import Reveal from "@/components/Reveal";
 import { searchVenues, getCategories, getGovernorates, isCategoryActive } from "@/lib/data";
 import { getI18n } from "@/lib/i18n/server";
 
@@ -41,15 +42,15 @@ export default async function Home() {
           />
         </div>
         <div className="relative max-w-6xl mx-auto px-5 py-28 md:py-36">
-          <p className="text-brass font-semibold tracking-wide text-sm uppercase mb-4">{t.home.eyebrow}</p>
-          <h1 className="font-display text-4xl md:text-6xl leading-[1.05] max-w-2xl">
+          <p className="text-brass font-semibold tracking-wide text-sm uppercase mb-4 animate-fade-up" style={{ animationDelay: "60ms" }}>{t.home.eyebrow}</p>
+          <h1 className="font-display text-4xl md:text-6xl leading-[1.05] max-w-2xl animate-fade-up" style={{ animationDelay: "140ms" }}>
             {t.home.title}
           </h1>
-          <p className="mt-5 text-onnight/70 max-w-lg text-lg">
+          <p className="mt-5 text-onnight/70 max-w-lg text-lg animate-fade-up" style={{ animationDelay: "240ms" }}>
             {t.home.subtitle}
           </p>
 
-          <form action="/search" className="mt-10 max-w-xl">
+          <form action="/search" className="mt-10 max-w-xl animate-fade-up" style={{ animationDelay: "340ms" }}>
             <div className="flex items-center gap-2 bg-surface rounded-full p-2 ps-5 shadow-xl">
               <input
                 type="text"
@@ -64,17 +65,17 @@ export default async function Home() {
           </form>
 
           {popularChips.length > 0 && (
-            <div className="flex flex-wrap gap-2 mt-6 text-sm text-onnight/70 items-center">
+            <div className="flex flex-wrap gap-2 mt-6 text-sm text-onnight/70 items-center animate-fade-up" style={{ animationDelay: "440ms" }}>
               <span>{t.home.popular}</span>
               {popularChips.map((chip, i) => (
-                <Link key={i} href={chip.href} className="bg-surface text-cream border border-hair rounded-full px-3 py-1 hover:border-emerald/50 transition">
+                <Link key={i} href={chip.href} className="bg-surface text-cream border border-hair rounded-full px-3 py-1 hover:border-emerald/50 hover:-translate-y-0.5 transition">
                   {chip.label}
                 </Link>
               ))}
             </div>
           )}
 
-          <Link href="/concierge" className="inline-flex items-center gap-2 mt-7 text-sm font-semibold text-night bg-brass hover:bg-brass-deep transition px-5 py-2.5 rounded-full">
+          <Link href="/concierge" className="inline-flex items-center gap-2 mt-7 text-sm font-semibold text-night bg-brass hover:bg-brass-deep hover:-translate-y-0.5 active:scale-95 transition px-5 py-2.5 rounded-full animate-fade-up" style={{ animationDelay: "540ms" }}>
             ✦ {t.concierge.eyebrow}
           </Link>
         </div>
@@ -90,16 +91,16 @@ export default async function Home() {
       </section>
 
       {/* Browse by category */}
-      <section className="max-w-6xl mx-auto px-5 pt-20 pb-4">
+      <Reveal as="section" className="max-w-6xl mx-auto px-5 pt-20 pb-4">
         <div className="mb-8">
           <p className="text-brass-deep text-sm font-semibold uppercase tracking-wide mb-2">{t.marketplace.categoriesEyebrow}</p>
           <h2 className="font-display text-3xl text-cream">{t.marketplace.categoriesTitle}</h2>
         </div>
         <CategoryGrid categories={categories} />
-      </section>
+      </Reveal>
 
       {/* Featured venues */}
-      <section className="max-w-6xl mx-auto px-5 py-20">
+      <Reveal as="section" className="max-w-6xl mx-auto px-5 py-20">
         <div className="flex items-end justify-between mb-8">
           <div>
             <p className="text-brass-deep text-sm font-semibold uppercase tracking-wide mb-2">{t.home.featuredEyebrow}</p>
@@ -114,10 +115,10 @@ export default async function Home() {
             <VenueCard key={v.id} venue={v} />
           ))}
         </div>
-      </section>
+      </Reveal>
 
       {/* CTA for venue owners */}
-      <section className="max-w-6xl mx-auto px-5 pb-24">
+      <Reveal as="section" className="max-w-6xl mx-auto px-5 pb-24">
         <div className="bg-surface border border-hair rounded-3xl p-10 md:p-14 flex flex-col md:flex-row items-center justify-between gap-8">
           <div>
             <h3 className="font-display text-2xl md:text-3xl text-cream mb-2">{t.home.ownerTitle}</h3>
@@ -132,7 +133,7 @@ export default async function Home() {
             {t.home.ownerButton}
           </Link>
         </div>
-      </section>
+      </Reveal>
     </div>
   );
 }

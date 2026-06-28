@@ -29,8 +29,8 @@ export default function WelcomeModal() {
   if (!show) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-night/60 backdrop-blur-sm p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={w.title}>
-      <div className="bg-canvas border border-hair w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-night/60 backdrop-blur-sm p-0 sm:p-4 animate-fade-in" role="dialog" aria-modal="true" aria-label={w.title}>
+      <div className="bg-canvas border border-hair w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto animate-modal-in">
         <div className="flex items-start justify-between gap-3">
           <p className="text-brass-deep text-xs font-semibold uppercase tracking-wide">{w.eyebrow}</p>
           <button onClick={dismiss} aria-label={w.skip} className="text-cream/40 hover:text-cream text-xl leading-none -mt-1">✕</button>

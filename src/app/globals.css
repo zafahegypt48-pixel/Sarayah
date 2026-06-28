@@ -79,3 +79,47 @@ html[dir="rtl"] .font-display {
 .arch-mask-lg {
   clip-path: path("M0,520 L0,170 C0,75 80,0 200,0 C320,0 400,75 400,170 L400,520 Z");
 }
+
+/* ============================================================================
+   Motion — subtle, premium, 60fps (transform/opacity only), reduced-motion aware
+   ============================================================================ */
+@keyframes sarayah-fade-up { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@keyframes sarayah-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sarayah-pop { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
+@keyframes sarayah-shimmer { 100% { transform: translateX(100%); } }
+@keyframes sarayah-modal-in { from { opacity: 0; transform: translateY(16px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes sarayah-dropdown-in { from { opacity: 0; transform: translateY(-6px) scale(.985); } to { opacity: 1; transform: none; } }
+@keyframes sarayah-typing { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
+
+.animate-fade-up { animation: sarayah-fade-up .5s cubic-bezier(.22,.61,.36,1) both; }
+.animate-fade-in { animation: sarayah-fade-in .5s ease both; }
+.animate-modal-in { animation: sarayah-modal-in .28s cubic-bezier(.22,.61,.36,1) both; }
+.animate-dropdown-in { animation: sarayah-dropdown-in .18s ease both; }
+.animate-pop { animation: sarayah-pop .4s ease; }
+
+/* Reveal-on-scroll: hidden until the Reveal component adds .is-visible */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity .6s cubic-bezier(.22,.61,.36,1), transform .6s cubic-bezier(.22,.61,.36,1); will-change: opacity, transform; }
+.reveal.is-visible { opacity: 1; transform: none; }
+
+/* Skeleton shimmer overlay (add `.skeleton` to a pulsing placeholder) */
+.skeleton { position: relative; overflow: hidden; }
+.skeleton::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--cream) 9%, transparent), transparent);
+  animation: sarayah-shimmer 1.5s infinite;
+}
+
+/* AI assistant typing indicator */
+.typing-dot { display: inline-block; width: 6px; height: 6px; border-radius: 9999px; background: currentColor; animation: sarayah-typing 1.2s infinite; }
+.typing-dot:nth-child(2) { animation-delay: .18s; }
+.typing-dot:nth-child(3) { animation-delay: .36s; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1 !important; transform: none !important; }
+}
