@@ -16,9 +16,18 @@ export default function WelcomeModal() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
+    // Force-show with ?welcome=1 (handy for testing / re-opening), else show only
+    // on a visitor's first visit.
+    let force = false;
+    try { force = new URLSearchParams(window.location.search).get("welcome") === "1"; } catch { force = false; }
     let seen = true;
     try { seen = localStorage.getItem(SEEN_KEY) === "1"; } catch { seen = false; }
-    if (!seen) setShow(true); // eslint-disable-line react-hooks/set-state-in-effect
+    if (force || !seen) setShow(true); // eslint-disable-line react-hooks/set-state-in-effect
+
+    // Allow other UI (e.g. a Settings button) to re-open it.
+    const open = () => setShow(true);
+    window.addEventListener("sarayah:welcome", open);
+    return () => window.removeEventListener("sarayah:welcome", open);
   }, []);
 
   function dismiss() {

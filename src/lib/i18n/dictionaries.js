@@ -633,6 +633,7 @@ const en = {
     notifPromotionsDesc: "Occasional product tips and launch offers.",
     notifSaved: "Notification preferences saved ✓",
     loginToManage: "Log in to manage your account and favorites.",
+    showWelcome: "Show welcome screen",
   },
 
   support: {
@@ -1282,6 +1283,7 @@ const ar = {
     notifPromotionsDesc: "نصائح عن المنصة وعروض الإطلاق من حين لآخر.",
     notifSaved: "تم حفظ تفضيلات الإشعارات ✓",
     loginToManage: "سجّل الدخول لإدارة حسابك ومفضّلاتك.",
+    showWelcome: "عرض شاشة الترحيب",
   },
 
   support: {

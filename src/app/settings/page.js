@@ -114,6 +114,13 @@ export default function SettingsPage() {
 
       {/* Help & support */}
       <Section label={s.help}>
+        <button
+          type="button"
+          onClick={() => { try { window.dispatchEvent(new Event("sarayah:welcome")); } catch { /* ignore */ } }}
+          className="mb-3 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold bg-surface border border-hair text-cream hover:border-emerald/50 transition active:scale-[0.97]"
+        >
+          👋 {s.showWelcome}
+        </button>
         <div className="flex flex-col text-sm">
           {[
             ["/support", t.nav.support],
