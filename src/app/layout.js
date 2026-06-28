@@ -37,10 +37,21 @@ const SITE_NAME = "Sarayah — سرايا";
 const SITE_DESC =
   "Sarayah — Egypt's directory for wedding and event venues. Browse hotels, gardens, villas, and rooftops, compare capacity, pricing, and amenities, then send one inquiry.";
 
+// Build a valid metadataBase even if NEXT_PUBLIC_SITE_URL is missing or malformed
+// (e.g. entered without "https://" on the host) — otherwise `new URL()` throws at
+// module load and 500s every page.
+function resolveSiteUrl() {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL;
+  const candidate = raw ? (raw.startsWith("http") ? raw : `https://${raw}`) : "http://localhost:3000";
+  try {
+    return new URL(candidate);
+  } catch {
+    return new URL("http://localhost:3000");
+  }
+}
+
 export const metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
-  ),
+  metadataBase: resolveSiteUrl(),
   title: {
     default: "Sarayah — Find your wedding & event venue in Egypt",
     template: "%s · Sarayah",
