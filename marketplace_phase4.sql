@@ -1,5 +1,5 @@
 -- ============================================================================
--- HAFLA — MARKETPLACE PHASE 4 (vendor self-service)
+-- SARAYAH — MARKETPLACE PHASE 4 (vendor self-service)
 -- ============================================================================
 -- Lets a logged-in vendor manage THEIR OWN listings + see THEIR OWN inquiries —
 -- WITHOUT giving the authenticated role broad UPDATE on venues (which would let a

@@ -1,4 +1,4 @@
-# Zafah — الزفة · Google Sheets Outreach & CSV Import Plan
+# Sarayah — سرايا · Google Sheets Outreach & CSV Import Plan
 
 A lightweight workflow for managing venue **outreach** and preparing **real venue
 data** for import into Supabase — **without** connecting Google Sheets to the app.

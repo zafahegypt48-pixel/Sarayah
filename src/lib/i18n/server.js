@@ -1,5 +1,5 @@
 // Server-side i18n helper for Server Components and Route Handlers.
-// Reads the locale from the `hafla_locale` cookie (set by the LanguageToggle).
+// Reads the locale from the `sarayah_locale` cookie (set by the LanguageToggle).
 // In Next.js 16 `cookies()` is async, so this helper is async too.
 import { cookies } from "next/headers";
 import {
@@ -18,7 +18,7 @@ export async function getLocale() {
 // Theme: light is the DEFAULT; dark is opt-in via the Settings toggle (cookie).
 export async function getTheme() {
   const store = await cookies();
-  return store.get("hafla_theme")?.value === "dark" ? "dark" : "light";
+  return store.get("sarayah_theme")?.value === "dark" ? "dark" : "light";
 }
 
 // Returns everything a server component needs to render in the active locale:

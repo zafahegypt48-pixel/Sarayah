@@ -1,4 +1,4 @@
-# Zafah — الزفة · Pre-Launch Checklist
+# Sarayah — سرايا · Pre-Launch Checklist
 
 Operational setup for launching the MVP. Nothing here is required for the app to
 *run* — every integration is optional and degrades gracefully — but these make it
@@ -16,7 +16,7 @@ production-ready. **Never commit `.env.local`; never put real keys in `.env.exam
 | `NEXT_PUBLIC_SITE_URL` | recommended | Vercel | Correct absolute links for SEO/Open Graph |
 | `RESEND_API_KEY` | optional | local + Vercel | Enables email notifications |
 | `ADMIN_NOTIFICATION_EMAIL` | optional | local + Vercel | Where admin alerts are sent |
-| `LEAD_NOTIFY_FROM` | optional | local + Vercel | Verified Resend sender (default `Zafah <onboarding@resend.dev>`) |
+| `LEAD_NOTIFY_FROM` | optional | local + Vercel | Verified Resend sender (default `Sarayah <onboarding@resend.dev>`) |
 | `UPSTASH_REDIS_REST_URL` | optional | local + Vercel | Enables rate limiting |
 | `UPSTASH_REDIS_REST_TOKEN` | optional | local + Vercel | Enables rate limiting |
 | `ANTHROPIC_API_KEY` | optional | local + Vercel | Smarter AI search (falls back to keyword parser) |
@@ -46,7 +46,7 @@ Setup:
 2. **API Keys → Create** → copy into `RESEND_API_KEY`.
 3. Set `ADMIN_NOTIFICATION_EMAIL` to where you want alerts.
 4. (Recommended) Verify your domain in Resend and set `LEAD_NOTIFY_FROM` to an
-   address on it, e.g. `Zafah <hello@zafah.app>`. Until then the shared
+   address on it, e.g. `Sarayah <hello@sarayah.app>`. Until then the shared
    `onboarding@resend.dev` sender works for testing.
 
 Without these: leads and venues still save; the server logs that email is disabled.

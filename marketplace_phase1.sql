@@ -1,5 +1,5 @@
 -- ============================================================================
--- HAFLA — MARKETPLACE PHASE 1 (database foundation)
+-- SARAYAH — MARKETPLACE PHASE 1 (database foundation)
 -- ============================================================================
 -- Turns the venues-only schema into a multi-category marketplace foundation.
 -- SAFE TO RUN on the existing DB: every statement is idempotent (if-not-exists /

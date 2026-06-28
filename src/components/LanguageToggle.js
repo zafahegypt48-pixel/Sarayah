@@ -5,7 +5,7 @@ import { useI18n } from "@/lib/i18n/client";
 import { LOCALE_COOKIE } from "@/lib/i18n/dictionaries";
 
 // Flips the site between English and Arabic. Persists the choice in the
-// `hafla_locale` cookie (1 year) then refreshes so the server re-renders the
+// `sarayah_locale` cookie (1 year) then refreshes so the server re-renders the
 // whole tree — including <html lang/dir> — in the new locale.
 export default function LanguageToggle({ className = "" }) {
   const { locale, t } = useI18n();

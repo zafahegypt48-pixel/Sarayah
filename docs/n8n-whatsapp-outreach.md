@@ -1,4 +1,4 @@
-# Zafah — الزفة · n8n + WhatsApp Outreach & Venue Verification
+# Sarayah — سرايا · n8n + WhatsApp Outreach & Venue Verification
 
 > **STATUS: OPTIONAL / POST-LAUNCH — NOT enabled, NOT required to deploy.**
 > The MVP ships **without** n8n or WhatsApp automation. Leave all `N8N_*` /
@@ -7,7 +7,7 @@
 
 A **semi-automated** outreach system: you manually add venue contacts to a Google
 Sheet and **approve** each one, then n8n sends a WhatsApp Business template
-inviting them to list on Zafah. This is **not** bulk spam — every contact is
+inviting them to list on Sarayah. This is **not** bulk spam — every contact is
 approved by you, opt-outs are respected, and rate limits apply.
 
 > **Golden rules**
@@ -16,7 +16,7 @@ approved by you, opt-outs are respected, and rate limits apply.
 > - Never message `do_not_contact` / `not_interested` / `registered` rows.
 > - Respect opt-out words (STOP / بلاش / متبعتش) immediately and permanently.
 > - Never log or expose API tokens.
-> - No venue goes public, and no “Verified by Zafah” badge appears, without admin action.
+> - No venue goes public, and no “Verified by Sarayah” badge appears, without admin action.
 
 ---
 
@@ -33,16 +33,16 @@ Set status =                 - filter approved_to_contact
 Venue replies ─────────────► Webhook "reply" workflow ──────► Classify reply (rules)
                              - update Sheet (status, reply)    send link / answer / opt-out
 
-Prospect opens link ───────► Zafah /add-venue?prospect_id=..  ─► POST /api/outreach/register-click
-Prospect submits venue ────► Zafah POST /api/venues ──────────► saved as pending_review
+Prospect opens link ───────► Sarayah /add-venue?prospect_id=..  ─► POST /api/outreach/register-click
+Prospect submits venue ────► Sarayah POST /api/venues ──────────► saved as pending_review
                              n8n POST /api/outreach/prospect-status (mark registered)
-Admin reviews ─────────────► Zafah /admin → approve / verify ─► venue goes public
+Admin reviews ─────────────► Sarayah /admin → approve / verify ─► venue goes public
 ```
 
 - **Google Sheet = source of truth** for the outreach pipeline.
-- **n8n** holds all WhatsApp credentials and runs the workflows. The Zafah app
+- **n8n** holds all WhatsApp credentials and runs the workflows. The Sarayah app
   never sends WhatsApp messages itself.
-- **Zafah app** exposes a few thin, secret-protected routes so n8n can correlate
+- **Sarayah app** exposes a few thin, secret-protected routes so n8n can correlate
   registrations, plus the public registration form and admin moderation.
 - **Supabase `outreach_prospects`** is only a tracking mirror (clicks /
   registration), not a second source of truth.
@@ -119,7 +119,7 @@ appears with `contacted / interested / registered / do_not_contact`, do not send
 set the new row to `duplicate` (or add a note).
 
 ### First message (meaning — must map to an approved template)
-> Hello, we’re launching **Zafah — الزفة**, a wedding and event venue finder for Egypt.
+> Hello, we’re launching **Sarayah — سرايا**, a wedding and event venue finder for Egypt.
 > We’re inviting selected hotels, halls, gardens, and event venues to list **for free during launch** so couples and event planners can discover them and send booking inquiries.
 > Would you like us to send you the free registration link?
 > Reply **YES** if interested, or **STOP** to not receive messages.
@@ -130,23 +130,23 @@ set the new row to `duplicate` (or add a note).
 
 Use template variables (`{{1}}`) where needed. Suggested templates:
 
-**`zafah_intro` (MARKETING/UTILITY, en + ar):**
+**`sarayah_intro` (MARKETING/UTILITY, en + ar):**
 ```
-Hello! We're launching Zafah — الزفة, a wedding & event venue finder for Egypt.
+Hello! We're launching Sarayah — سرايا, a wedding & event venue finder for Egypt.
 We're inviting venues like yours to list FREE during launch and receive booking
 inquiries from couples and event planners.
 Reply YES to get your free registration link, or STOP to opt out.
 ```
 
-**`zafah_registration_link` (UTILITY):**
+**`sarayah_registration_link` (UTILITY):**
 ```
 Great! Here is your free registration link: {{1}}
 Listing is free during launch. Reply STOP anytime to opt out.
 ```
 
-**`zafah_followup` (UTILITY, sent once after 3 days):**
+**`sarayah_followup` (UTILITY, sent once after 3 days):**
 ```
-Just following up from Zafah — الزفة. Free venue listing during launch is still
+Just following up from Sarayah — سرايا. Free venue listing during launch is still
 open. Reply YES for your registration link, or STOP to opt out.
 ```
 
@@ -174,7 +174,7 @@ Steps:
 |---|---|---|---|
 | **interested** | yes, interested, ok / تمام، مهتم، ابعت، ابعتلي، سجل، عايز أعرف | `interested` | send registration link; `next_action = waiting_for_registration` |
 | **pricing_question** | price, cost, fees, subscription / بكام، كام، السعر، الاشتراك، المصاريف | `pricing_question` | reply "free during launch" + send link; `next_action = waiting_for_registration` |
-| **needs_more_info** | details, who are you, what is this / مين أنتم، تفاصيل، إيه ده، الموقع ده إيه، بتعملوا إيه | `needs_more_info` | send short Zafah explanation + benefits |
+| **needs_more_info** | details, who are you, what is this / مين أنتم، تفاصيل، إيه ده، الموقع ده إيه، بتعملوا إيه | `needs_more_info` | send short Sarayah explanation + benefits |
 | **not_interested** | no, not interested / لا، مش مهتم، مش محتاجين، بعدين | `not_interested` | polite closing; **no auto follow-up** |
 | **opt_out** | stop, unsubscribe, remove / بلاش، متبعتش، امسح الرقم، مش عايز رسائل | `do_not_contact` | send ONE confirmation; never message again |
 | **unclear** | anything else | `manual_review` | save reply; notify admin; do not auto-reply more than once |
@@ -195,7 +195,7 @@ Trigger: daily schedule.
 Steps:
 1. Find rows where `status = contacted` AND no reply AND `last_message_sent` older
    than **3 days** AND no follow-up already sent.
-2. Send **one** follow-up template (`zafah_followup`).
+2. Send **one** follow-up template (`sarayah_followup`).
 3. Update → `status = follow_up`, `next_action = no_more_auto_messages`.
 
 Never send more than one automated follow-up.
@@ -219,7 +219,7 @@ When a prospect registers via their link `/add-venue?source=whatsapp&prospect_id
 
 ---
 
-## 9. Venue moderation & verification (in the Zafah app)
+## 9. Venue moderation & verification (in the Sarayah app)
 
 This is built into the app (not n8n):
 
@@ -257,7 +257,7 @@ A would-be owner can request to claim an existing listing. Save
 verification.
 
 ### Public labels
-- **“Verified by Zafah”** — only when `verification_status = verified` (admin-set).
+- **“Verified by Sarayah”** — only when `verification_status = verified` (admin-set).
 - **“Unverified listing”** — approved but not verified.
 - **“Report this listing”** — on every venue detail page.
 
@@ -269,7 +269,7 @@ verification.
   Reports tab. Admin can **Suspend** the venue from the Venues tab.
 - **Audit log** (`venue_audit`): approvals, rejections, verifications, deletes.
 - Submitted **owner documents/contact stay private** — never displayed publicly.
-- **No payments** are collected through Zafah in this MVP.
+- **No payments** are collected through Sarayah in this MVP.
 - **Disclaimer** shown on venue detail (EN + AR): users confirm availability,
   prices, contracts, and payment directly with the venue before paying.
 
@@ -348,7 +348,7 @@ WhatsApp tokens are **server-only** — never reference them in client component
 **Venue safety**
 - [ ] New submission saved `pending_review`; not on public `/venues`.
 - [ ] Admin approve → appears publicly; reject → stays hidden.
-- [ ] Admin verify → “Verified by Zafah” badge; unverify removes it.
+- [ ] Admin verify → “Verified by Sarayah” badge; unverify removes it.
 - [ ] A user cannot self-verify (server forces `unverified` on submit).
 - [ ] Claim stays `claim_pending` until admin review.
 - [ ] Famous-hotel submissions require stronger verification (process, §9).

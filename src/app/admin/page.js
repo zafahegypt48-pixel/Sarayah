@@ -126,7 +126,7 @@ export default function AdminPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `hafla-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `sarayah-leads-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

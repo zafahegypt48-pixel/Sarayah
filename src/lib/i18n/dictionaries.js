@@ -10,7 +10,7 @@
 
 export const LOCALES = ["en", "ar"];
 export const DEFAULT_LOCALE = "en";
-export const LOCALE_COOKIE = "hafla_locale";
+export const LOCALE_COOKIE = "sarayah_locale";
 
 export function dirFor(locale) {
   return locale === "ar" ? "rtl" : "ltr";

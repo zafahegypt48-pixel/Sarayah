@@ -1,5 +1,5 @@
 -- ===========================================================================
--- Zafah — الزفة · Complete Supabase schema + security (single source of truth)
+-- Sarayah — سرايا · Complete Supabase schema + security (single source of truth)
 -- ===========================================================================
 -- Run on a FRESH Supabase project: SQL Editor -> New query -> paste -> Run.
 -- This recreates the full current state: tables, columns, functions, RLS,

@@ -1,4 +1,4 @@
-# Zafah — الزفة · n8n Mirror: Supabase → Google Sheets (one-way)
+# Sarayah — سرايا · n8n Mirror: Supabase → Google Sheets (one-way)
 
 > **STATUS: OPTIONAL / POST-LAUNCH — NOT enabled, NOT required to deploy.**
 > The MVP ships **without** n8n. This whole workflow is disabled unless you set
@@ -89,13 +89,13 @@ venue_id | venue_name | city | owner_name | owner_phone | owner_whatsapp | owner
 1. n8n Cloud → **Create Workflow**.
 2. Add a **Webhook** node:
    - HTTP Method: **POST**
-   - Path: e.g. `zafah-mirror`
+   - Path: e.g. `sarayah-mirror`
    - **Authentication: Header Auth** → create a credential:
      - Name: `x-webhook-secret`
      - Value: the **same** string as `N8N_WEBHOOK_SECRET`
    - This makes n8n reject any request without the correct secret (401) — random
      callers can't append rows.
-3. Copy the **Production URL** (e.g. `https://<you>.app.n8n.cloud/webhook/zafah-mirror`)
+3. Copy the **Production URL** (e.g. `https://<you>.app.n8n.cloud/webhook/sarayah-mirror`)
    → this is your `N8N_WEBHOOK_URL`.
 
 ### b) Route by event type

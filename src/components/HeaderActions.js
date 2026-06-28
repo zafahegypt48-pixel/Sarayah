@@ -47,7 +47,7 @@ export default function HeaderActions() {
     router.refresh();
   }
   function setTheme(next) {
-    writeCookie("hafla_theme", next);
+    writeCookie("sarayah_theme", next);
     setThemeState(next);
     if (typeof document !== "undefined") document.documentElement.setAttribute("data-theme", next);
   }

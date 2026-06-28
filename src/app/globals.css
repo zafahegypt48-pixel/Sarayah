@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 :root {
-  /* LIGHT THEME — the default (warm beige + ink, Hafla's signature look). */
+  /* LIGHT THEME — the default (warm beige + ink, Sarayah's signature look). */
   --canvas: #fbf7ef;   /* page background                 */
   --surface: #ffffff;  /* cards / inputs                  */
   --cream: #16241c;    /* primary text (theme-aware)      */

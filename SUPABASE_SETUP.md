@@ -5,7 +5,7 @@ persist once you deploy — needed before going live.
 
 ## 1. Create a free Supabase project
 1. Go to https://supabase.com -> sign up -> "New project"
-2. Pick a name (e.g. "zafah") and a database password (save it somewhere)
+2. Pick a name (e.g. "sarayah") and a database password (save it somewhere)
 3. Wait ~2 minutes for it to provision
 
 ## 2. Create the tables

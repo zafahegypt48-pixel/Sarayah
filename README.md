@@ -1,6 +1,6 @@
-# Zafah — الزفة — Wedding & Event Venue Finder (Egypt)
+# Sarayah — سرايا — Wedding & Event Venue Finder (Egypt)
 
-Zafah (الزفة) is a wedding and event venue finder/marketplace for the Egyptian
+Sarayah (سرايا) is a wedding and event venue finder/marketplace for the Egyptian
 market: couples browse and filter venues, send a booking inquiry, and venue
 owners list their space for free. It includes Supabase auth, an admin dashboard,
 real image uploads, lead capture with email notifications, and an AI search

@@ -1,4 +1,4 @@
-# Zafah — الزفة · Database Security & Privacy
+# Sarayah — سرايا · Database Security & Privacy
 
 How the database protects private data, and how to reproduce it. The single
 source of truth for recreating the DB is **`supabase_schema.sql`** (run it on a

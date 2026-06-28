@@ -31,7 +31,7 @@ function getLimiter(name, limit, windowSeconds) {
       new Ratelimit({
         redis,
         limiter: Ratelimit.slidingWindow(limit, `${windowSeconds} s`),
-        prefix: `hafla:rl:${name}`,
+        prefix: `sarayah:rl:${name}`,
         analytics: false,
       })
     );
