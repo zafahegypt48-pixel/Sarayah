@@ -17,12 +17,18 @@ export function isAdminEmail(email) {
 }
 
 // Returns the currently logged-in Supabase user, or null if not signed in.
+// Hardened: if Supabase env vars are missing/wrong (e.g. not set on the host),
+// this returns null instead of throwing — so the navbar (which runs on EVERY
+// page) can never 500 the whole site over an auth hiccup.
 export async function getCurrentUser() {
-  const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  return user || null;
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    return user || null;
+  } catch {
+    return null;
+  }
 }
 
 // Returns the user only if they are an admin, otherwise null.
