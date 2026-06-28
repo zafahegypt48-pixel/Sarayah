@@ -2,17 +2,9 @@ import { getVenueById } from "@/lib/data";
 import LeadForm from "@/components/LeadForm";
 import ReportVenue from "@/components/ReportVenue";
 import { notFound } from "next/navigation";
+import { getI18n } from "@/lib/i18n/server";
 
-const AMENITY_LABELS = {
-  catering: "Catering",
-  parking: "Parking",
-  bridalRoom: "Bridal room",
-  dj: "DJ / sound system",
-  decoration: "Decoration included",
-  kidsArea: "Kids area",
-  ac: "Air conditioning",
-  valet: "Valet parking",
-};
+const AMENITY_KEYS = ["catering", "parking", "bridalRoom", "dj", "decoration", "kidsArea", "ac", "valet"];
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +13,9 @@ export default async function VenueDetailsPage({ params }) {
   const venue = await getVenueById(id);
   if (!venue) return notFound();
 
-  const activeAmenities = Object.keys(AMENITY_LABELS).filter((k) => venue[k]);
+  const { t, tv } = await getI18n();
+  const amenityLabels = t.detail.amenityLabels;
+  const activeAmenities = AMENITY_KEYS.filter((k) => venue[k]);
 
   return (
     <div className="max-w-6xl mx-auto px-5 py-10">
@@ -51,42 +45,42 @@ export default async function VenueDetailsPage({ params }) {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold bg-emerald/10 text-emerald px-3 py-1 rounded-full">{venue.type}</span>
+                <span className="text-xs font-semibold bg-emerald/10 text-emerald px-3 py-1 rounded-full">{tv("type", venue.type)}</span>
                 {venue.verification_status === "verified" && (
-                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">✓ Verified by Zafah</span>
+                  <span className="text-xs font-semibold bg-blue-100 text-blue-700 px-3 py-1 rounded-full">{t.detail.verifiedBadge}</span>
                 )}
               </div>
-              <h1 className="font-display text-3xl md:text-4xl text-ink mt-3">{venue.name}</h1>
-              <p className="text-ink/60 mt-1">{venue.area}, {venue.city}</p>
+              <h1 className="font-display text-3xl md:text-4xl text-cream mt-3">{venue.name}</h1>
+              <p className="text-cream/60 mt-1">{venue.area}, {venue.city}</p>
             </div>
             {venue.rating > 0 && (
               <div className="text-right shrink-0">
                 <div className="flex items-center gap-1 justify-end text-brass-deep font-semibold">
                   ★ {venue.rating}
                 </div>
-                {venue.reviews > 0 && <p className="text-xs text-ink/50">{venue.reviews} reviews</p>}
+                {venue.reviews > 0 && <p className="text-xs text-cream/50">{venue.reviews} reviews</p>}
               </div>
             )}
           </div>
 
-          <p className="text-ink/70 leading-relaxed mt-6">{venue.description}</p>
+          <p className="text-cream/70 leading-relaxed mt-6">{venue.description}</p>
 
           {/* Key facts */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8">
-            <Fact label="Capacity" value={`${venue.capacityMin}–${venue.capacityMax} guests`} />
-            <Fact label="Halls" value={venue.halls} />
-            <Fact label="Venue size" value={`${venue.venueSize} m²`} />
-            <Fact label="Setting" value={venue.indoorOutdoor} />
+            <Fact label={t.detail.capacity} value={t.detail.capacityValue.replace("{min}", venue.capacityMin).replace("{max}", venue.capacityMax)} />
+            <Fact label={t.detail.halls} value={venue.halls} />
+            <Fact label={t.detail.venueSize} value={`${venue.venueSize} m²`} />
+            <Fact label={t.detail.setting} value={tv("setting", venue.indoorOutdoor)} />
           </div>
 
           {/* Amenities */}
           <div className="mt-10">
-            <h2 className="font-display text-xl text-ink mb-4">Amenities</h2>
+            <h2 className="font-display text-xl text-cream mb-4">{t.detail.amenitiesTitle}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {activeAmenities.length === 0 && <p className="text-sm text-ink/50">No amenities listed yet.</p>}
+              {activeAmenities.length === 0 && <p className="text-sm text-cream/50">{t.detail.noAmenities}</p>}
               {activeAmenities.map((k) => (
-                <div key={k} className="flex items-center gap-2 text-sm text-ink/70">
-                  <span className="text-emerald">✓</span> {AMENITY_LABELS[k]}
+                <div key={k} className="flex items-center gap-2 text-sm text-cream/70">
+                  <span className="text-emerald">✓</span> {amenityLabels[k]}
                 </div>
               ))}
             </div>
@@ -94,23 +88,18 @@ export default async function VenueDetailsPage({ params }) {
 
           {/* Suitable for */}
           <div className="mt-10">
-            <h2 className="font-display text-xl text-ink mb-4">Suitable for</h2>
+            <h2 className="font-display text-xl text-cream mb-4">{t.detail.suitableForTitle}</h2>
             <div className="flex gap-2 flex-wrap">
               {(venue.suitableFor || []).map((e) => (
-                <span key={e} className="text-sm bg-white border border-line px-3 py-1.5 rounded-full text-ink/70">{e}</span>
+                <span key={e} className="text-sm bg-surface border border-hair px-3 py-1.5 rounded-full text-cream/70">{tv("event", e)}</span>
               ))}
             </div>
           </div>
 
           {/* Disclaimer + report */}
-          <div className="mt-10 bg-white border border-line rounded-2xl p-5">
-            <p className="text-sm text-ink/60 leading-relaxed">
-              Zafah helps you discover and contact venues. Confirm availability, prices, contracts, and
-              payment terms directly with the venue before making any payment.
-            </p>
-            <p className="text-sm text-ink/60 leading-relaxed mt-2" dir="rtl">
-              Zafah — الزفة تساعدك على اكتشاف أماكن المناسبات والتواصل معها. تأكد من التوافر والأسعار وشروط
-              الحجز والدفع مباشرةً مع المكان قبل دفع أي مبالغ.
+          <div className="mt-10 bg-surface border border-hair rounded-2xl p-5">
+            <p className="text-sm text-cream/60 leading-relaxed">
+              {t.detail.disclaimer}
             </p>
             <ReportVenue venueId={venue.id} />
           </div>
@@ -118,10 +107,10 @@ export default async function VenueDetailsPage({ params }) {
 
         {/* Sticky lead form */}
         <div>
-          <div className="sticky top-24 bg-white border border-line rounded-2xl p-6">
-            <p className="text-sm text-ink/50 mb-1">Starting price</p>
+          <div className="sticky top-24 bg-surface border border-hair rounded-2xl p-6">
+            <p className="text-sm text-cream/50 mb-1">{t.detail.startingPrice}</p>
             <p className="font-display text-2xl text-emerald mb-5">{venue.startingPrice.toLocaleString()} EGP</p>
-            <h3 className="font-semibold text-ink mb-4">Send a booking inquiry</h3>
+            <h3 className="font-semibold text-cream mb-4">{t.detail.sendInquiryTitle}</h3>
             <LeadForm venueId={venue.id} venueName={venue.name} />
           </div>
         </div>
@@ -132,9 +121,9 @@ export default async function VenueDetailsPage({ params }) {
 
 function Fact({ label, value }) {
   return (
-    <div className="bg-white border border-line rounded-xl p-4">
-      <p className="text-xs text-ink/50 mb-1">{label}</p>
-      <p className="font-semibold text-ink">{value}</p>
+    <div className="bg-surface border border-hair rounded-xl p-4">
+      <p className="text-xs text-cream/50 mb-1">{label}</p>
+      <p className="font-semibold text-cream">{value}</p>
     </div>
   );
 }

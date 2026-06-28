@@ -2,8 +2,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useI18n } from "@/lib/i18n/client";
 
 export default function SignupPage() {
+  const { t } = useI18n();
+  const ts = t.signup;
   const router = useRouter();
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -32,7 +35,7 @@ export default function SignupPage() {
     }
     // If email confirmation is on, there's no active session yet.
     if (!data.session) {
-      setMessage("Check your email to confirm your account, then log in.");
+      setMessage(ts.confirmEmail);
       return;
     }
     router.push("/");
@@ -41,28 +44,28 @@ export default function SignupPage() {
 
   return (
     <div className="max-w-md mx-auto px-5 py-24">
-      <h1 className="font-display text-3xl text-ink mb-2">Sign up</h1>
-      <p className="text-ink/60 mb-8 text-sm">
-        Create an account to list venues or track your inquiries.
+      <h1 className="font-display text-3xl text-cream mb-2">{ts.title}</h1>
+      <p className="text-cream/60 mb-8 text-sm">
+        {ts.subtitle}
       </p>
-      <form onSubmit={handleSubmit} className="space-y-4 bg-white border border-line rounded-2xl p-6">
+      <form onSubmit={handleSubmit} className="space-y-4 bg-surface border border-hair rounded-2xl p-6">
         <div>
-          <label className="text-sm font-medium text-ink/70 block mb-1.5">Full name</label>
-          <input name="fullName" required className="w-full border border-line rounded-lg px-3 py-2.5 text-sm" />
+          <label className="text-sm font-medium text-cream/70 block mb-1.5">{ts.fullName}</label>
+          <input name="fullName" required className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="text-sm font-medium text-ink/70 block mb-1.5">Email</label>
-          <input name="email" type="email" required className="w-full border border-line rounded-lg px-3 py-2.5 text-sm" />
+          <label className="text-sm font-medium text-cream/70 block mb-1.5">{ts.email}</label>
+          <input name="email" type="email" required className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="text-sm font-medium text-ink/70 block mb-1.5">Password</label>
-          <input name="password" type="password" required minLength={6} className="w-full border border-line rounded-lg px-3 py-2.5 text-sm" />
+          <label className="text-sm font-medium text-cream/70 block mb-1.5">{ts.password}</label>
+          <input name="password" type="password" required minLength={8} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
         </div>
         <div>
-          <label className="text-sm font-medium text-ink/70 block mb-1.5">I am a...</label>
-          <select name="role" className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white">
-            <option value="couple">Couple planning an event</option>
-            <option value="owner">Venue owner / manager</option>
+          <label className="text-sm font-medium text-cream/70 block mb-1.5">{ts.iAm}</label>
+          <select name="role" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+            <option value="couple">{ts.couple}</option>
+            <option value="owner">{ts.owner}</option>
           </select>
         </div>
         {error && <p className="text-sm text-red-600">{error}</p>}
@@ -70,13 +73,13 @@ export default function SignupPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full bg-emerald text-ivory font-semibold py-3 rounded-full hover:opacity-90 transition disabled:opacity-50"
+          className="w-full bg-emerald text-onnight font-semibold py-3 rounded-full hover:opacity-90 transition disabled:opacity-50"
         >
-          {loading ? "Creating account…" : "Create account"}
+          {loading ? ts.loading : ts.button}
         </button>
       </form>
-      <p className="text-sm text-ink/50 mt-4 text-center">
-        Already have an account? <a href="/login" className="text-emerald font-semibold">Log in</a>
+      <p className="text-sm text-cream/50 mt-4 text-center">
+        {ts.haveAccount} <a href="/login" className="text-emerald font-semibold">{ts.loginLink}</a>
       </p>
     </div>
   );

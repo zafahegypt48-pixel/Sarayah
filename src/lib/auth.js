@@ -61,3 +61,21 @@ export async function getAdminContext() {
   );
   return { user, supabase };
 }
+
+// Like getAdminContext but for ANY logged-in user (no admin requirement). Returns
+// { user, supabase } where the client carries the user's JWT, so RLS policies that
+// check auth.uid() (favorites, profiles) work. Returns null if not signed in.
+export async function getUserContext() {
+  const ssr = await createSupabaseServerClient();
+  const { data: { user } } = await ssr.auth.getUser();
+  if (!user) return null;
+  const { data: { session } } = await ssr.auth.getSession();
+  const token = session?.access_token;
+  if (!token) return null;
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    { accessToken: async () => token }
+  );
+  return { user, supabase };
+}

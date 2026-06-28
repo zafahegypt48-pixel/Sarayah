@@ -18,7 +18,7 @@ export default async function AdminLayout({ children }) {
 
   return (
     <div>
-      <div className="bg-ink text-ivory/70 text-xs">
+      <div className="bg-night text-onnight/70 text-xs">
         <div className="max-w-6xl mx-auto px-5 py-2 flex items-center justify-between">
           <span>Signed in as {user.email}</span>
           <LogoutButton />

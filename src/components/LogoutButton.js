@@ -1,8 +1,10 @@
 "use client";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useI18n } from "@/lib/i18n/client";
 
 export default function LogoutButton() {
+  const { t } = useI18n();
   const router = useRouter();
 
   async function handleLogout() {
@@ -14,7 +16,7 @@ export default function LogoutButton() {
 
   return (
     <button onClick={handleLogout} className="underline hover:opacity-70 transition">
-      Log out
+      {t.nav.logout}
     </button>
   );
 }

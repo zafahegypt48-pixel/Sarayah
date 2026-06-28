@@ -1,6 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Zafah">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Sarayah">
   <rect width="64" height="64" rx="14" fill="#16241c"/>
-  <text x="32" y="34" text-anchor="middle" dominant-baseline="central"
-        font-family="Georgia, 'Times New Roman', serif" font-size="34" font-weight="700"
-        fill="#c9a05c">Z.</text>
+  <text x="30" y="33" text-anchor="middle" dominant-baseline="central"
+        font-family="'Poppins', 'Segoe UI', Arial, sans-serif" font-size="32" font-weight="700"
+        fill="#fbf7ef">S</text>
+  <circle cx="48" cy="42" r="4.5" fill="#bf7a52"/>
 </svg>

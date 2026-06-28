@@ -54,8 +54,13 @@ export async function parseQueryWithLLM(text) {
         role: "user",
         content:
           "You extract structured wedding/event venue search filters from a user's " +
-          "natural-language query for venues in Egypt. Only set a field if the query " +
-          "clearly implies it; otherwise use null (or false for amenities). " +
+          "natural-language query for venues in Egypt. The query may be in Arabic or " +
+          "English. ALWAYS return the canonical ENGLISH values defined in the schema " +
+          "(e.g. Arabic 'القاهرة الجديدة' → location 'new cairo'; 'فندق' → type 'hotel'; " +
+          "'زفاف'/'فرح' → suitableFor 'Wedding'; 'مفتوح' → indoorOutdoor 'Outdoor'), so " +
+          "they match the English-stored data. Normalize Arabic-Indic digits (٣٠٠ → 300) " +
+          "and 'ألف'/'k' to thousands. Only set a field if the query clearly implies it; " +
+          "otherwise use null (or false for amenities). " +
           `Query: "${text}"`,
       },
     ],

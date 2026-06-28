@@ -1,28 +1,74 @@
 @import "tailwindcss";
 
 :root {
-  --ink: #16241c;
-  --ivory: #fbf7ef;
-  --brass: #c9a05c;
+  /* LIGHT THEME — the default (warm beige + ink, Hafla's signature look). */
+  --canvas: #fbf7ef;   /* page background                 */
+  --surface: #ffffff;  /* cards / inputs                  */
+  --cream: #16241c;    /* primary text (theme-aware)      */
+  --night: #16241c;    /* always-dark sections (hero/footer) */
+  --onnight: #fbf7ef;  /* text ON dark sections (always light) */
+  --hair: #e4ddcf;     /* borders / hairlines             */
+  --brass: #c9a05c;    /* gold accent                     */
   --brass-deep: #a9803f;
   --emerald: #234d3a;
+  /* legacy tokens kept for residual utilities (e.g. shadow-ink) */
+  --ink: #16241c;
+  --ivory: #fbf7ef;
   --line: #e4ddcf;
 }
 
+/* DARK THEME — opt-in via the Settings toggle (sets data-theme="dark"). */
+html[data-theme="dark"] {
+  --canvas: #12150f;
+  --surface: #1b211a;
+  --cream: #ece7da;
+  --night: #0c0e09;
+  --onnight: #ece7da;
+  --hair: #2c332a;
+  --brass: #cda25e;
+  --brass-deep: #b98a44;
+  --emerald: #46a07a;
+  --ink: #0c0e09;
+  --ivory: #ece7da;
+  --line: #2c332a;
+}
+
 @theme inline {
-  --color-ink: var(--ink);
-  --color-ivory: var(--ivory);
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-night: var(--night);
+  --color-cream: var(--cream);
+  --color-onnight: var(--onnight);
+  --color-hair: var(--hair);
   --color-brass: var(--brass);
   --color-brass-deep: var(--brass-deep);
   --color-emerald: var(--emerald);
+  --color-ink: var(--ink);
+  --color-ivory: var(--ivory);
+  --color-line: var(--line);
   --font-display: var(--font-fraunces);
   --font-sans: var(--font-worksans);
 }
 
 body {
-  background: var(--ivory);
-  color: var(--ink);
+  background: var(--canvas);
+  color: var(--cream);
   font-family: var(--font-sans);
+}
+
+/* Form controls inherit the dark theme (dark fields, light text). */
+input, select, textarea {
+  background-color: var(--surface);
+  color: var(--cream);
+}
+input::placeholder, textarea::placeholder { color: color-mix(in srgb, var(--cream) 40%, transparent); }
+select option { background-color: var(--surface); color: var(--cream); }
+
+/* Arabic / RTL: swap both the body and the display font to an Arabic-capable
+   face (Fraunces/Work Sans are Latin-only and render Arabic poorly). */
+html[dir="rtl"] body,
+html[dir="rtl"] .font-display {
+  font-family: var(--font-arabic), sans-serif;
 }
 
 /* Signature element: pointed-arch image mask, echoing Egyptian venue architecture */

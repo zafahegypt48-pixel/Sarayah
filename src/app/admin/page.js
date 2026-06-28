@@ -10,7 +10,7 @@ const LEAD_STATUS_STYLES = {
   new: "bg-emerald/10 text-emerald",
   contacted: "bg-brass/20 text-brass-deep",
   booked: "bg-blue-100 text-blue-700",
-  closed: "bg-ink/10 text-ink/50",
+  closed: "bg-night/10 text-cream/50",
 };
 
 const VENUE_STATUSES = ["pending_review", "approved", "rejected", "suspended"];
@@ -18,7 +18,7 @@ const VENUE_STATUS_STYLES = {
   pending_review: "bg-brass/20 text-brass-deep",
   approved: "bg-emerald/10 text-emerald",
   rejected: "bg-red-100 text-red-700",
-  suspended: "bg-ink/10 text-ink/50",
+  suspended: "bg-night/10 text-cream/50",
   verified: "bg-blue-100 text-blue-700",
 };
 
@@ -34,6 +34,7 @@ export default function AdminPage() {
   const [venues, setVenues] = useState([]);
   const [leads, setLeads] = useState([]);
   const [reports, setReports] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [tab, setTab] = useState("venues");
   const [venueFilter, setVenueFilter] = useState("pending_review");
   const [leadSearch, setLeadSearch] = useState("");
@@ -46,16 +47,18 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [vRes, lRes, rRes] = await Promise.all([
+      const [vRes, lRes, rRes, revRes] = await Promise.all([
         fetch("/api/venues?scope=admin"),
         fetch("/api/leads"),
         fetch("/api/reports"),
+        fetch("/api/reviews"),
       ]);
       if (!vRes.ok) throw new Error("Failed to load venues (are you signed in as admin?)");
       if (!lRes.ok) throw new Error("Failed to load leads");
       setVenues(await vRes.json());
       setLeads(await lRes.json());
       setReports(rRes.ok ? await rRes.json() : []);
+      setReviews(revRes.ok ? await revRes.json() : []);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -83,6 +86,15 @@ export default function AdminPage() {
     else alert("Could not delete venue.");
   }
 
+  async function patchReview(id, status) {
+    const res = await fetch(`/api/reviews/${id}`, {
+      method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }),
+    });
+    if (!res.ok) { alert("Action failed."); return; }
+    const updated = await res.json();
+    setReviews((rs) => rs.map((r) => (r.id === id ? updated : r)));
+  }
+
   async function updateLeadStatus(id, status) {
     const prev = leads;
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status } : l)));
@@ -94,6 +106,7 @@ export default function AdminPage() {
 
   const filteredVenues = venueFilter === "all" ? venues : venues.filter((v) => (v.status || "pending_review") === venueFilter);
   const pendingCount = venues.filter((v) => (v.status || "pending_review") === "pending_review").length;
+  const pendingReviews = reviews.filter((r) => (r.status || "pending") === "pending").length;
 
   const filteredLeads = leads.filter((l) => {
     if (leadStatusFilter !== "all" && (l.status || "new") !== leadStatusFilter) return false;
@@ -113,7 +126,7 @@ export default function AdminPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `zafah-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.download = `hafla-leads-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -121,32 +134,34 @@ export default function AdminPage() {
   return (
     <div className="max-w-6xl mx-auto px-5 py-10">
       <div className="flex items-center justify-between mb-1">
-        <h1 className="font-display text-3xl text-ink">Admin dashboard</h1>
-        <button onClick={loadAll} className="text-sm font-semibold text-emerald hover:text-ink transition">↻ Refresh</button>
+        <h1 className="font-display text-3xl text-cream">Admin dashboard</h1>
+        <button onClick={loadAll} className="text-sm font-semibold text-emerald hover:text-cream transition">↻ Refresh</button>
       </div>
-      <p className="text-ink/60 mb-6">Review submissions, manage venues, and track inquiries.</p>
+      <p className="text-cream/60 mb-6">Review submissions, manage venues, and track inquiries.</p>
 
       {!loading && !error && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
           <Stat label="Pending venues" value={pendingCount} highlight={pendingCount > 0} onClick={() => { setTab("venues"); setVenueFilter("pending_review"); }} />
           <Stat label="Live venues" value={venues.filter((v) => ["approved", "verified"].includes(v.status)).length} />
           <Stat label="New leads" value={leads.filter((l) => (l.status || "new") === "new").length} highlight={leads.some((l) => (l.status || "new") === "new")} onClick={() => setTab("leads")} />
           <Stat label="Open reports" value={reports.length} highlight={reports.length > 0} onClick={() => setTab("reports")} />
+          <Stat label="Pending reviews" value={pendingReviews} highlight={pendingReviews > 0} onClick={() => setTab("reviews")} />
         </div>
       )}
 
-      <div className="flex gap-6 border-b border-line mb-8">
+      <div className="flex gap-6 border-b border-hair mb-8">
         {[["venues", `Venues (${venues.length})${pendingCount ? ` · ${pendingCount} pending` : ""}`],
           ["leads", `Leads (${leads.length})`],
-          ["reports", `Reports (${reports.length})`]].map(([t, label]) => (
+          ["reports", `Reports (${reports.length})`],
+          ["reviews", `Reviews (${reviews.length})${pendingReviews ? ` · ${pendingReviews} pending` : ""}`]].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)}
-            className={`pb-3 text-sm font-semibold border-b-2 transition ${tab === t ? "border-emerald text-emerald" : "border-transparent text-ink/40 hover:text-ink"}`}>
+            className={`pb-3 text-sm font-semibold border-b-2 transition ${tab === t ? "border-emerald text-emerald" : "border-transparent text-cream/40 hover:text-cream"}`}>
             {label}
           </button>
         ))}
       </div>
 
-      {loading && <p className="text-ink/50 py-12 text-center">Loading…</p>}
+      {loading && <p className="text-cream/50 py-12 text-center">Loading…</p>}
       {error && !loading && (
         <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 text-sm">
           {error} <button onClick={loadAll} className="underline font-semibold ml-2">Retry</button>
@@ -157,46 +172,46 @@ export default function AdminPage() {
       {!loading && !error && tab === "venues" && (
         <>
           <div className="flex items-center gap-2 mb-4 flex-wrap">
-            <span className="text-sm text-ink/50">Filter:</span>
+            <span className="text-sm text-cream/50">Filter:</span>
             {["pending_review", "approved", "rejected", "suspended", "all"].map((s) => (
               <button key={s} onClick={() => setVenueFilter(s)}
-                className={`text-xs font-semibold px-3 py-1.5 rounded-full transition ${venueFilter === s ? "bg-ink text-ivory" : "bg-white border border-line text-ink/60 hover:text-ink"}`}>
+                className={`text-xs font-semibold px-3 py-1.5 rounded-full transition ${venueFilter === s ? "bg-night text-onnight" : "bg-surface border border-hair text-cream/60 hover:text-cream"}`}>
                 {s.replace("_", " ")}
               </button>
             ))}
           </div>
-          <p className="text-xs text-ink/40 mb-3">Sorted newest first.</p>
-          <div className="bg-white border border-line rounded-2xl overflow-x-auto">
+          <p className="text-xs text-cream/40 mb-3">Sorted newest first.</p>
+          <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
             <table className="w-full text-sm min-w-[980px]">
-              <thead className="bg-ink text-ivory text-xs uppercase">
+              <thead className="bg-night text-onnight text-xs uppercase">
                 <tr>{["Name", "Type", "City", "Source", "Status", "Verified", "Dates", "Actions"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
               </thead>
               <tbody>
                 {filteredVenues.length === 0 && (
-                  <tr><td colSpan={8} className="text-center py-10 text-ink/40">No venues in this view.</td></tr>
+                  <tr><td colSpan={8} className="text-center py-10 text-cream/40">No venues in this view.</td></tr>
                 )}
                 {filteredVenues.map((v) => {
                   const status = v.status || "pending_review";
                   const verified = v.verification_status === "verified";
                   return (
-                    <tr key={v.id} className="border-t border-line align-middle">
+                    <tr key={v.id} className="border-t border-hair align-middle">
                       <td className="px-4 py-3 font-medium">{v.name}</td>
                       <td className="px-4 py-3">{v.type}</td>
                       <td className="px-4 py-3">{v.city}</td>
-                      <td className="px-4 py-3 text-ink/50">{v.source === "whatsapp_outreach" ? "WhatsApp" : "Public"}</td>
+                      <td className="px-4 py-3 text-cream/50">{v.source === "whatsapp_outreach" ? "WhatsApp" : "Public"}</td>
                       <td className="px-4 py-3">
                         <span className={`text-xs font-semibold rounded-full px-2.5 py-1 capitalize ${VENUE_STATUS_STYLES[status]}`}>
                           {status.replace("_", " ")}
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        {verified ? <span className="text-xs font-semibold text-blue-700">✓ Verified</span> : <span className="text-xs text-ink/40">—</span>}
+                        {verified ? <span className="text-xs font-semibold text-blue-700">✓ Verified</span> : <span className="text-xs text-cream/40">—</span>}
                       </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-xs text-ink/50">
+                      <td className="px-4 py-3 whitespace-nowrap text-xs text-cream/50">
                         <div>{fmtDate(v.created_at)}</div>
                         {v.updated_at && v.updated_at !== v.created_at && (
-                          <div className="text-ink/35">upd {fmtDate(v.updated_at)}</div>
+                          <div className="text-cream/35">upd {fmtDate(v.updated_at)}</div>
                         )}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
@@ -207,7 +222,7 @@ export default function AdminPage() {
                           </>
                         )}
                         {(status === "approved" || status === "verified") && (
-                          <button onClick={() => patchVenue(v.id, { status: "suspended" })} className="text-xs font-semibold text-ink/60 hover:underline mr-2">Suspend</button>
+                          <button onClick={() => patchVenue(v.id, { status: "suspended" })} className="text-xs font-semibold text-cream/60 hover:underline mr-2">Suspend</button>
                         )}
                         {(status === "suspended" || status === "rejected") && (
                           <button onClick={() => patchVenue(v.id, { status: "approved" })} className="text-xs font-semibold text-emerald hover:underline mr-2">Re-approve</button>
@@ -217,7 +232,7 @@ export default function AdminPage() {
                           className="text-xs font-semibold text-blue-700 hover:underline mr-2">
                           {verified ? "Unverify" : "Verify"}
                         </button>
-                        <button onClick={() => setEditing(v)} className="text-xs font-semibold text-ink/70 hover:underline mr-2">Edit</button>
+                        <button onClick={() => setEditing(v)} className="text-xs font-semibold text-cream/70 hover:underline mr-2">Edit</button>
                         <button onClick={() => deleteVenue(v)} className="text-xs font-semibold text-red-600 hover:underline">Delete</button>
                       </td>
                     </tr>
@@ -237,28 +252,28 @@ export default function AdminPage() {
               value={leadSearch}
               onChange={(e) => setLeadSearch(e.target.value)}
               placeholder="Search name, phone, email, venue…"
-              className="flex-1 min-w-[200px] border border-line rounded-lg px-3 py-2 text-sm bg-white"
+              className="flex-1 min-w-[200px] border border-hair rounded-lg px-3 py-2 text-sm bg-surface"
             />
             <select value={leadStatusFilter} onChange={(e) => setLeadStatusFilter(e.target.value)}
-              className="border border-line rounded-lg px-3 py-2 text-sm bg-white">
+              className="border border-hair rounded-lg px-3 py-2 text-sm bg-surface">
               <option value="all">All statuses</option>
               {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
             </select>
             <button onClick={exportLeadsCsv} disabled={filteredLeads.length === 0}
-              className="text-sm font-semibold bg-emerald text-ivory px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40">
+              className="text-sm font-semibold bg-emerald text-onnight px-4 py-2 rounded-lg hover:opacity-90 disabled:opacity-40">
               Export CSV ({filteredLeads.length})
             </button>
           </div>
-        <div className="bg-white border border-line rounded-2xl overflow-x-auto">
+        <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
           <table className="w-full text-sm min-w-[820px]">
-            <thead className="bg-ink text-ivory text-xs uppercase">
+            <thead className="bg-night text-onnight text-xs uppercase">
               <tr>{["Venue", "Name", "Phone", "Email", "Event", "Date", "Guests", "Status", "Received"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
             </thead>
             <tbody>
-              {filteredLeads.length === 0 && (<tr><td colSpan={9} className="text-center py-10 text-ink/40">No leads match.</td></tr>)}
+              {filteredLeads.length === 0 && (<tr><td colSpan={9} className="text-center py-10 text-cream/40">No leads match.</td></tr>)}
               {filteredLeads.map((l) => (
-                <tr key={l.id} className="border-t border-line">
+                <tr key={l.id} className="border-t border-hair">
                   <td className="px-4 py-3 font-medium">{l.venueName || "—"}</td>
                   <td className="px-4 py-3">{l.name}</td>
                   <td className="px-4 py-3 whitespace-nowrap">{l.phone}</td>
@@ -272,10 +287,10 @@ export default function AdminPage() {
                       {LEAD_STATUSES.map((s) => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </td>
-                  <td className="px-4 py-3 text-ink/50 whitespace-nowrap text-xs">
+                  <td className="px-4 py-3 text-cream/50 whitespace-nowrap text-xs">
                     <div>{fmtDate(l.createdAt)}</div>
                     {l.status_updated_at && (
-                      <div className="text-ink/35">status {fmtDate(l.status_updated_at)}</div>
+                      <div className="text-cream/35">status {fmtDate(l.status_updated_at)}</div>
                     )}
                   </td>
                 </tr>
@@ -288,26 +303,66 @@ export default function AdminPage() {
 
       {/* ---------------- REPORTS ---------------- */}
       {!loading && !error && tab === "reports" && (
-        <div className="bg-white border border-line rounded-2xl overflow-x-auto">
+        <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
-            <thead className="bg-ink text-ivory text-xs uppercase">
+            <thead className="bg-night text-onnight text-xs uppercase">
               <tr>{["Venue ID", "Reason", "Details", "Contact", "When"].map((h) => (
                 <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
             </thead>
             <tbody>
-              {reports.length === 0 && (<tr><td colSpan={5} className="text-center py-10 text-ink/40">No reports.</td></tr>)}
+              {reports.length === 0 && (<tr><td colSpan={5} className="text-center py-10 text-cream/40">No reports.</td></tr>)}
               {reports.map((r) => (
-                <tr key={r.id} className="border-t border-line align-top">
+                <tr key={r.id} className="border-t border-hair align-top">
                   <td className="px-4 py-3 font-mono text-xs">{r.venue_id || "—"}</td>
                   <td className="px-4 py-3 capitalize">{(r.reason || "").replace("_", " ")}</td>
-                  <td className="px-4 py-3 text-ink/70 max-w-xs">{r.details || "—"}</td>
+                  <td className="px-4 py-3 text-cream/70 max-w-xs">{r.details || "—"}</td>
                   <td className="px-4 py-3">{r.reporter_contact || "—"}</td>
-                  <td className="px-4 py-3 text-ink/50 whitespace-nowrap">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-3 text-cream/50 whitespace-nowrap">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="text-xs text-ink/40 p-4">To act on a report, suspend the venue from the Venues tab.</p>
+          <p className="text-xs text-cream/40 p-4">To act on a report, suspend the venue from the Venues tab.</p>
+        </div>
+      )}
+
+      {/* ---------------- REVIEWS ---------------- */}
+      {!loading && !error && tab === "reviews" && (
+        <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
+          <table className="w-full text-sm min-w-[820px]">
+            <thead className="bg-night text-onnight text-xs uppercase">
+              <tr>{["Listing", "Author", "Rating", "Review", "Status", "When", "Actions"].map((h) => (
+                <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
+            </thead>
+            <tbody>
+              {reviews.length === 0 && (<tr><td colSpan={7} className="text-center py-10 text-cream/40">No reviews.</td></tr>)}
+              {reviews.map((r) => (
+                <tr key={r.id} className="border-t border-hair align-top">
+                  <td className="px-4 py-3 font-mono text-xs">{r.listing_id || "—"}</td>
+                  <td className="px-4 py-3 font-medium">{r.author_name}</td>
+                  <td className="px-4 py-3 text-brass whitespace-nowrap">{"★".repeat(r.rating || 0)}</td>
+                  <td className="px-4 py-3 text-cream/70 max-w-xs">
+                    {r.title && <div className="font-medium text-cream/80">{r.title}</div>}
+                    {r.body || (r.title ? "" : "—")}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`text-xs font-semibold rounded-full px-2.5 py-1 capitalize ${
+                      r.status === "approved" ? "bg-emerald/10 text-emerald" : r.status === "rejected" ? "bg-red-100 text-red-700" : "bg-brass/20 text-brass-deep"
+                    }`}>{r.status || "pending"}</span>
+                  </td>
+                  <td className="px-4 py-3 text-cream/50 whitespace-nowrap text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString() : "—"}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    {r.status !== "approved" && (
+                      <button onClick={() => patchReview(r.id, "approved")} className="text-xs font-semibold text-emerald hover:underline mr-2">Approve</button>
+                    )}
+                    {r.status !== "rejected" && (
+                      <button onClick={() => patchReview(r.id, "rejected")} className="text-xs font-semibold text-red-600 hover:underline">Reject</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -385,16 +440,16 @@ function VenueEditModal({ venue, onClose, onSaved }) {
   ].filter(([, v]) => v);
 
   return (
-    <div className="fixed inset-0 bg-ink/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-ivory rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-night/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-canvas rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h2 className="font-display text-2xl text-ink">Edit venue</h2>
-          <button onClick={onClose} className="text-ink/40 hover:text-ink text-xl">✕</button>
+          <h2 className="font-display text-2xl text-cream">Edit venue</h2>
+          <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl">✕</button>
         </div>
 
         {(proof.length > 0 || form.authorization_confirmed || (form.verification_docs || []).length > 0) && (
-          <div className="bg-white border border-line rounded-xl p-4 mb-5">
-            <p className="text-xs font-semibold text-ink/50 uppercase tracking-wide mb-2">Submitted contact / proof</p>
+          <div className="bg-surface border border-hair rounded-xl p-4 mb-5">
+            <p className="text-xs font-semibold text-cream/50 uppercase tracking-wide mb-2">Submitted contact / proof</p>
             <p className="text-xs mb-2">
               Authorization confirmed:{" "}
               {form.authorization_confirmed
@@ -404,28 +459,28 @@ function VenueEditModal({ venue, onClose, onSaved }) {
             {proof.length > 0 && (
               <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1 text-sm">
                 {proof.map(([label, val]) => (
-                  <div key={label}><span className="text-ink/50">{label}: </span><span className="text-ink/80 break-all">{val}</span></div>
+                  <div key={label}><span className="text-cream/50">{label}: </span><span className="text-cream/80 break-all">{val}</span></div>
                 ))}
               </div>
             )}
             {(form.verification_docs || []).length > 0 && (
               <div className="mt-3">
-                <p className="text-xs text-ink/50 mb-1">Private verification documents (admin-only):</p>
+                <p className="text-xs text-cream/50 mb-1">Private verification documents (admin-only):</p>
                 <div className="flex flex-wrap gap-2">
                   {(form.verification_docs || []).map((p, i) => (
                     <button key={p} type="button" onClick={() => viewDoc(p)}
-                      className="text-xs font-semibold bg-ink text-ivory px-3 py-1.5 rounded-full hover:opacity-90">
+                      className="text-xs font-semibold bg-night text-onnight px-3 py-1.5 rounded-full hover:opacity-90">
                       View document {i + 1}
                     </button>
                   ))}
                 </div>
               </div>
             )}
-            <p className="text-xs text-ink/40 mt-3">Verify ownership independently (callback to the official public number / business email) before marking Verified.</p>
+            <p className="text-xs text-cream/40 mt-3">Verify ownership independently (callback to the official public number / business email) before marking Verified.</p>
           </div>
         )}
 
-        <div className="text-xs text-ink/50 mb-5 flex flex-wrap gap-x-5 gap-y-1">
+        <div className="text-xs text-cream/50 mb-5 flex flex-wrap gap-x-5 gap-y-1">
           <span>Submitted: {fmtDateTime(form.created_at)}</span>
           {form.approved_at && <span>Approved: {fmtDateTime(form.approved_at)}</span>}
           {form.rejected_at && <span>Rejected: {fmtDateTime(form.rejected_at)}</span>}
@@ -448,26 +503,26 @@ function VenueEditModal({ venue, onClose, onSaved }) {
         </div>
 
         <div className="mt-4">
-          <label className="text-sm font-medium text-ink/70 block mb-1.5">Description</label>
+          <label className="text-sm font-medium text-cream/70 block mb-1.5">Description</label>
           <textarea value={form.description || ""} onChange={(e) => set("description", e.target.value)} rows={3}
-            className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white" />
+            className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface" />
         </div>
 
         {/* Contact & outreach (WhatsApp/phone — no in-app chat) */}
-        <div className="border-t border-line pt-4 mt-5">
-          <p className="text-sm font-semibold text-ink/70 mb-3">Contact &amp; outreach</p>
+        <div className="border-t border-hair pt-4 mt-5">
+          <p className="text-sm font-semibold text-cream/70 mb-3">Contact &amp; outreach</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-sm font-medium text-ink/70 block mb-1.5">Contact status</label>
+              <label className="text-sm font-medium text-cream/70 block mb-1.5">Contact status</label>
               <select
                 value={form.contact_status || "not_contacted"}
                 onChange={(e) => quickPatch({ contact_status: e.target.value })}
-                className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white"
+                className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface"
               >
                 {CONTACT_STATUSES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
               </select>
             </div>
-            <div className="flex items-end text-xs text-ink/50">
+            <div className="flex items-end text-xs text-cream/50">
               {form.last_contacted_at ? `Last contacted: ${new Date(form.last_contacted_at).toLocaleString()}` : "Not contacted yet"}
             </div>
           </div>
@@ -480,21 +535,21 @@ function VenueEditModal({ venue, onClose, onSaved }) {
             <a
               href={waNumber ? `https://wa.me/${waNumber}` : undefined}
               target="_blank" rel="noopener noreferrer"
-              className={`text-xs font-semibold px-3 py-2 rounded-full ${waNumber ? "bg-emerald text-ivory hover:opacity-90" : "bg-ink/10 text-ink/30 pointer-events-none"}`}
+              className={`text-xs font-semibold px-3 py-2 rounded-full ${waNumber ? "bg-emerald text-onnight hover:opacity-90" : "bg-night/10 text-cream/30 pointer-events-none"}`}
             >WhatsApp</a>
             <a
               href={form.owner_phone ? `tel:${form.owner_phone}` : undefined}
-              className={`text-xs font-semibold px-3 py-2 rounded-full ${form.owner_phone ? "bg-ink text-ivory hover:opacity-90" : "bg-ink/10 text-ink/30 pointer-events-none"}`}
+              className={`text-xs font-semibold px-3 py-2 rounded-full ${form.owner_phone ? "bg-night text-onnight hover:opacity-90" : "bg-night/10 text-cream/30 pointer-events-none"}`}
             >Call</a>
             <a
               href={form.owner_email ? `mailto:${form.owner_email}` : undefined}
-              className={`text-xs font-semibold px-3 py-2 rounded-full ${form.owner_email ? "bg-brass-deep text-ivory hover:opacity-90" : "bg-ink/10 text-ink/30 pointer-events-none"}`}
+              className={`text-xs font-semibold px-3 py-2 rounded-full ${form.owner_email ? "bg-brass-deep text-onnight hover:opacity-90" : "bg-night/10 text-cream/30 pointer-events-none"}`}
             >Email</a>
           </div>
           <div className="mt-4">
-            <label className="text-sm font-medium text-ink/70 block mb-1.5">Admin notes (internal)</label>
+            <label className="text-sm font-medium text-cream/70 block mb-1.5">Admin notes (internal)</label>
             <textarea value={form.admin_notes || ""} onChange={(e) => set("admin_notes", e.target.value)} rows={2}
-              className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white" />
+              className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface" />
           </div>
         </div>
 
@@ -504,10 +559,10 @@ function VenueEditModal({ venue, onClose, onSaved }) {
         </div>
 
         <div className="mt-4">
-          <label className="text-sm font-medium text-ink/70 block mb-2">Amenities</label>
+          <label className="text-sm font-medium text-cream/70 block mb-2">Amenities</label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {AMENITIES.map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 text-sm text-ink/70">
+              <label key={key} className="flex items-center gap-2 text-sm text-cream/70">
                 <input type="checkbox" checked={!!form[key]} onChange={(e) => set(key, e.target.checked)} className="accent-emerald" />
                 {label}
               </label>
@@ -517,8 +572,8 @@ function VenueEditModal({ venue, onClose, onSaved }) {
 
         {err && <p className="text-sm text-red-600 mt-4">{err}</p>}
         <div className="flex justify-end gap-3 mt-6">
-          <button onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-ink/60 hover:text-ink">Cancel</button>
-          <button onClick={save} disabled={saving} className="px-6 py-2.5 text-sm font-semibold bg-emerald text-ivory rounded-full hover:opacity-90 disabled:opacity-50">
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-cream/60 hover:text-cream">Cancel</button>
+          <button onClick={save} disabled={saving} className="px-6 py-2.5 text-sm font-semibold bg-emerald text-onnight rounded-full hover:opacity-90 disabled:opacity-50">
             {saving ? "Saving…" : "Save changes"}
           </button>
         </div>
@@ -533,10 +588,10 @@ function Stat({ label, value, highlight, onClick }) {
       type="button"
       onClick={onClick}
       disabled={!onClick}
-      className={`text-left rounded-2xl border p-4 transition ${highlight ? "border-emerald/40 bg-emerald/5" : "border-line bg-white"} ${onClick ? "hover:border-emerald/60 cursor-pointer" : "cursor-default"}`}
+      className={`text-left rounded-2xl border p-4 transition ${highlight ? "border-emerald/40 bg-emerald/5" : "border-hair bg-surface"} ${onClick ? "hover:border-emerald/60 cursor-pointer" : "cursor-default"}`}
     >
-      <div className={`font-display text-2xl ${highlight ? "text-emerald" : "text-ink"}`}>{value}</div>
-      <div className="text-xs text-ink/50 mt-0.5">{label}</div>
+      <div className={`font-display text-2xl ${highlight ? "text-emerald" : "text-cream"}`}>{value}</div>
+      <div className="text-xs text-cream/50 mt-0.5">{label}</div>
     </button>
   );
 }
@@ -544,9 +599,9 @@ function Stat({ label, value, highlight, onClick }) {
 function Field({ label, value, onChange, type = "text", full }) {
   return (
     <div className={full ? "col-span-2" : ""}>
-      <label className="text-sm font-medium text-ink/70 block mb-1.5">{label}</label>
+      <label className="text-sm font-medium text-cream/70 block mb-1.5">{label}</label>
       <input type={type} value={value ?? ""} onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white" />
+        className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface" />
     </div>
   );
 }
@@ -554,9 +609,9 @@ function Field({ label, value, onChange, type = "text", full }) {
 function SelectField({ label, value, options, onChange }) {
   return (
     <div>
-      <label className="text-sm font-medium text-ink/70 block mb-1.5">{label}</label>
+      <label className="text-sm font-medium text-cream/70 block mb-1.5">{label}</label>
       <select value={value ?? ""} onChange={(e) => onChange(e.target.value)}
-        className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white">
+        className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
         {options.map((o) => <option key={o}>{o}</option>)}
       </select>
     </div>

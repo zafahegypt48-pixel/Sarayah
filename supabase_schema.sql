@@ -81,6 +81,14 @@ create table if not exists venues (
   suspended_at timestamptz
 );
 create index if not exists venues_status_idx on venues(status);
+-- Indexes supporting the public filtered listing (searchVenues): partial on the
+-- publicly visible rows, plus a GIN index for the suitableFor array `contains`.
+create index if not exists venues_city_idx          on venues(city)          where status in ('approved','verified');
+create index if not exists venues_type_idx          on venues(type)          where status in ('approved','verified');
+create index if not exists venues_capacitymax_idx   on venues("capacityMax") where status in ('approved','verified');
+create index if not exists venues_startingprice_idx on venues("startingPrice") where status in ('approved','verified');
+create index if not exists venues_created_at_idx     on venues(created_at desc);
+create index if not exists venues_suitablefor_idx    on venues using gin ("suitableFor");
 
 create table if not exists leads (
   id text primary key default ('l' || replace(gen_random_uuid()::text, '-', '')),
@@ -98,6 +106,8 @@ create table if not exists leads (
   status_updated_at timestamptz,
   "createdAt" timestamptz default now()
 );
+-- Covering index for the venueId foreign key (admin lead lookups by venue).
+create index if not exists leads_venueid_idx on leads("venueId");
 
 -- Admins identified by email (matches the auth JWT email claim). Keep in sync
 -- with ADMIN_EMAILS in the app env. Locked down: no RLS policies => no API access.
@@ -125,6 +135,8 @@ create table if not exists venue_reports (
   status text default 'open',
   created_at timestamptz default now()
 );
+-- Covering index for the venue_id foreign key (admin report triage by venue).
+create index if not exists venue_reports_venue_idx on venue_reports(venue_id);
 
 create table if not exists venue_audit (
   id bigint generated always as identity primary key,
@@ -277,10 +289,15 @@ grant select (
 -- ---------------------------------------------------------------------------
 -- 5. STORAGE BUCKETS
 -- ---------------------------------------------------------------------------
--- venue-images: PUBLIC (venue photos shown on the site).
-insert into storage.buckets (id, name, public)
-values ('venue-images', 'venue-images', true)
-on conflict (id) do nothing;
+-- venue-images: PUBLIC (venue photos shown on the site). Public INSERT is allowed
+-- (free listing flow), so cap size and restrict to safe raster image types (NO svg
+-- — it can carry script). 5MB limit.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('venue-images', 'venue-images', true, 5242880,
+        array['image/jpeg','image/png','image/webp','image/gif'])
+on conflict (id) do update
+  set public = true, file_size_limit = 5242880,
+      allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif'];
 
 -- venue-docs: PRIVATE verification/proof documents. 5MB, images + PDF only.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -308,3 +325,13 @@ create policy "Public upload venue images" on storage.objects for insert with ch
 create policy "venue_docs_public_insert" on storage.objects for insert with check (bucket_id = 'venue-docs');
 create policy "venue_docs_admin_read"    on storage.objects for select to authenticated using (bucket_id = 'venue-docs' and is_admin());
 create policy "venue_docs_admin_delete"  on storage.objects for delete to authenticated using (bucket_id = 'venue-docs' and is_admin());
+
+-- ---------------------------------------------------------------------------
+-- 6. MARKETPLACE (Phase 1) — categories, locations, listing evolution, packages,
+--    listing_images, reviews, favorites, profiles.
+-- ---------------------------------------------------------------------------
+-- The full marketplace DDL lives in `marketplace_phase1.sql` (kept separate so it
+-- can be run as an additive migration on the existing DB without re-running the
+-- core schema above). For a FRESH recreate: run THIS file first, then run
+-- `marketplace_phase1.sql`. It is idempotent and depends on `is_admin()` (defined
+-- above), so the order matters: core schema → marketplace_phase1.sql.

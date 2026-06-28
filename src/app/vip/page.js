@@ -1,52 +1,45 @@
 import Link from "next/link";
+import { getI18n } from "@/lib/i18n/server";
 
 export const metadata = {
   title: "VIP venue listings — coming soon",
   description:
-    "Premium placement and featured listings for venues on Zafah are coming soon. Join the waitlist to be first.",
+    "Premium placement and featured listings for venues on Sarayah are coming soon. Join the waitlist to be first.",
 };
 
-const PERKS = [
-  ["Featured placement", "Appear at the top of search and listings for your city."],
-  ["Verified badge", "A trust badge that tells couples your venue is verified by Zafah."],
-  ["Priority leads", "Get booking inquiries delivered first, with richer details."],
-  ["Photo galleries", "Showcase more photos and highlight your best spaces."],
-];
-
-export default function VipPage() {
+export default async function VipPage() {
+  const { t } = await getI18n();
   return (
     <div className="max-w-4xl mx-auto px-5 py-20">
       <p className="text-brass-deep text-sm font-semibold uppercase tracking-wide mb-2 text-center">
-        For venue owners
+        {t.vip.eyebrow}
       </p>
-      <h1 className="font-display text-4xl md:text-5xl text-ink text-center">
-        VIP listings — <span className="text-emerald">coming soon</span>
+      <h1 className="font-display text-4xl md:text-5xl text-cream text-center">
+        {t.vip.titlePre}<span className="text-emerald">{t.vip.titleHighlight}</span>
       </h1>
-      <p className="text-ink/60 text-center mt-4 max-w-xl mx-auto">
-        Listing on Zafah is free during launch. Soon, venues will be able to upgrade
-        to VIP for premium placement and more booking inquiries. No payment is
-        required today — we&apos;ll let you know the moment it&apos;s ready.
+      <p className="text-cream/60 text-center mt-4 max-w-xl mx-auto">
+        {t.vip.intro}
       </p>
 
       <div className="grid sm:grid-cols-2 gap-5 mt-12">
-        {PERKS.map(([title, desc]) => (
-          <div key={title} className="bg-white border border-line rounded-2xl p-6">
-            <h3 className="font-semibold text-ink mb-1">{title}</h3>
-            <p className="text-sm text-ink/60">{desc}</p>
+        {t.vip.perks.map(([title, desc]) => (
+          <div key={title} className="bg-surface border border-hair rounded-2xl p-6">
+            <h3 className="font-semibold text-cream mb-1">{title}</h3>
+            <p className="text-sm text-cream/60">{desc}</p>
           </div>
         ))}
       </div>
 
-      <div className="bg-ink text-ivory rounded-3xl p-10 mt-12 text-center">
-        <h2 className="font-display text-2xl mb-2">Want VIP when it launches?</h2>
-        <p className="text-ivory/70 mb-6 max-w-md mx-auto">
-          List your venue for free now — every free listing is first in line for the VIP early-access offer.
+      <div className="bg-night text-onnight rounded-3xl p-10 mt-12 text-center">
+        <h2 className="font-display text-2xl mb-2">{t.vip.ctaTitle}</h2>
+        <p className="text-cream/70 mb-6 max-w-md mx-auto">
+          {t.vip.ctaBody}
         </p>
         <Link
           href="/add-venue"
-          className="inline-block bg-emerald text-ivory font-semibold px-7 py-3.5 rounded-full hover:opacity-90 transition"
+          className="inline-block bg-emerald text-onnight font-semibold px-7 py-3.5 rounded-full hover:opacity-90 transition"
         >
-          List your venue — free
+          {t.vip.ctaButton}
         </Link>
       </div>
 

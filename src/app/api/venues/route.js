@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
-import { addVenue, getVenues } from "@/lib/data";
-import { getAdminContext } from "@/lib/auth";
+import { addVenue, getVenues, searchVenues } from "@/lib/data";
+import { getAdminContext, getCurrentUser } from "@/lib/auth";
 import { notifyNewVenueSubmission, notifyOwnerVenueReceived } from "@/lib/notify";
 import { mirrorVenueToN8n } from "@/lib/n8n";
 import { checkRateLimit, tooManyRequests } from "@/lib/ratelimit";
@@ -12,11 +12,54 @@ const ALLOWED = new Set([
   "capacityMin", "capacityMax", "startingPrice", "halls", "venueSize",
   "description", "suitableFor", "images",
   "catering", "parking", "bridalRoom", "dj", "decoration", "kidsArea", "ac", "valet",
+  // marketplace fields (any category):
+  "category_id", "governorate_id", "city_id", "price_min", "price_max",
   // contact / proof details the submitter provides for later verification:
   "owner_name", "owner_role", "owner_email", "owner_phone", "owner_whatsapp",
   "official_website", "google_maps_link", "social_link",
 ]);
-const NUMERIC = new Set(["capacityMin", "capacityMax", "startingPrice", "halls", "venueSize"]);
+const NUMERIC = new Set(["capacityMin", "capacityMax", "startingPrice", "halls", "venueSize", "price_min", "price_max"]);
+const CATEGORY_SLUGS = new Set([
+  "venues", "photography", "videography", "makeup-hair", "catering", "entertainment",
+  "wedding-dresses", "flowers-decor", "cakes-sweets", "invitations", "wedding-cars", "planners",
+]);
+
+// Whitelisted public listing filters and their coercion (string vs. positive int
+// vs. boolean). Anything else in the query string is ignored.
+const VENUE_TYPES = ["Hotel", "Hall", "Garden", "Villa", "Rooftop", "Restaurant"];
+const SETTINGS = ["Indoor", "Outdoor"];
+const SUITABLE = ["Wedding", "Engagement", "Birthday", "Corporate Event"];
+
+function parseListingFilters(searchParams) {
+  const f = {};
+  // Marketplace facets (slugs from reference tables — bounded length, no enum
+  // needed because a bad slug simply matches nothing).
+  const category = searchParams.get("category");
+  if (category) f.category = String(category).slice(0, 40);
+  const governorate = searchParams.get("governorate");
+  if (governorate) f.governorate = String(governorate).slice(0, 40);
+  const cityId = searchParams.get("cityId");
+  if (cityId) f.cityId = String(cityId).slice(0, 40);
+  const priceMax = Number(searchParams.get("priceMax"));
+  if (Number.isFinite(priceMax) && priceMax > 0) f.priceMax = Math.round(priceMax);
+  // Legacy venue facets:
+  const city = searchParams.get("city");
+  if (city) f.city = String(city).slice(0, 80);
+  const type = searchParams.get("type");
+  if (VENUE_TYPES.includes(type)) f.type = type;
+  const setting = searchParams.get("indoorOutdoor");
+  if (SETTINGS.includes(setting)) f.indoorOutdoor = setting;
+  const suitableFor = searchParams.get("suitableFor");
+  if (SUITABLE.includes(suitableFor)) f.suitableFor = suitableFor;
+  const cap = Number(searchParams.get("capacity"));
+  if (Number.isFinite(cap) && cap > 0 && cap <= 100000) f.capacity = Math.round(cap);
+  const bud = Number(searchParams.get("budget"));
+  if (Number.isFinite(bud) && bud > 0) f.budget = Math.round(bud);
+  for (const a of ["catering", "parking", "dj", "bridalRoom"]) {
+    if (searchParams.get(a) === "true") f[a] = true;
+  }
+  return f;
+}
 
 // Never cache — venue visibility depends on live moderation status.
 export const dynamic = "force-dynamic";
@@ -36,8 +79,13 @@ export async function GET(request) {
     }
   }
 
+  // Public listing: filtered + paginated in the DB. Returns { venues, total, page, pageSize }.
   try {
-    return Response.json(await getVenues());
+    const filters = parseListingFilters(searchParams);
+    const page = Number(searchParams.get("page")) || 1;
+    const pageSize = Number(searchParams.get("pageSize")) || 12;
+    const { venues, total } = await searchVenues({ filters, page, pageSize });
+    return Response.json({ venues, total, page, pageSize });
   } catch (err) {
     console.error("Venues read failed:", err.message);
     return Response.json({ error: "Could not load venues." }, { status: 500 });
@@ -66,7 +114,18 @@ export async function POST(request) {
     if (!ALLOWED.has(key)) continue;
     venue[key] = NUMERIC.has(key) ? Number(value) || 0 : value;
   }
+  // Validate category against the known set (bad/unknown → addVenue defaults to "venues").
+  if (venue.category_id && !CATEGORY_SLUGS.has(venue.category_id)) delete venue.category_id;
+  // Category-specific structured fields (free-form JSON, bounded by the DB column).
+  if (body.attributes && typeof body.attributes === "object" && !Array.isArray(body.attributes)) {
+    venue.attributes = body.attributes;
+  }
+  // Starting price doubles as the listing's price_min if not given explicitly.
+  if (!venue.price_min && venue.startingPrice) venue.price_min = venue.startingPrice;
   venue.authorization_confirmed = true;
+  // If the submitter is logged in, they OWN this listing (vendor self-service).
+  const submitter = await getCurrentUser();
+  if (submitter) venue.claimed_by_user_id = submitter.id;
   // App-generated id so Supabase and any downstream mirror (n8n → Sheet) share the
   // same key (anon can't read the DB-generated id back through RLS).
   venue.id = "v" + randomUUID().replace(/-/g, "");

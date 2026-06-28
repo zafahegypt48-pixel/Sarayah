@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
+import { useI18n } from "@/lib/i18n/client";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1200&q=80";
@@ -47,21 +48,28 @@ async function uploadProofDocs(files) {
   return paths;
 }
 
-const AMENITIES = [
-  ["catering", "Catering"],
-  ["parking", "Parking"],
-  ["bridalRoom", "Bridal room"],
-  ["dj", "DJ / sound system"],
-  ["decoration", "Decoration included"],
-  ["kidsArea", "Kids area"],
-  ["ac", "Air conditioning"],
-  ["valet", "Valet parking"],
-];
+const AMENITY_KEYS = ["catering", "parking", "bridalRoom", "dj", "decoration", "kidsArea", "ac", "valet"];
 
 function AddVenueInner() {
+  const { t, tv, locale } = useI18n();
+  const ta = t.addVenue;
   const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [cats, setCats] = useState([]);
+  const [govs, setGovs] = useState([]);
+  const [cities, setCities] = useState([]);
+  const [category, setCategory] = useState("venues");
+  const [governorate, setGovernorate] = useState("");
   const params = useSearchParams();
+
+  // Load categories + locations for the selectors.
+  useEffect(() => {
+    fetch("/api/categories").then((r) => (r.ok ? r.json() : [])).then(setCats).catch(() => {});
+    fetch("/api/locations").then((r) => (r.ok ? r.json() : { governorates: [], cities: [] }))
+      .then((d) => { setGovs(d.governorates || []); setCities(d.cities || []); }).catch(() => {});
+  }, []);
+  const cityOptions = cities.filter((c) => !governorate || c.governorate_id === governorate);
+  const isVenue = category === "venues";
   // Outreach attribution (from WhatsApp registration links).
   const source = params.get("source") === "whatsapp" ? "whatsapp_outreach" : "public";
   const prospectId = params.get("prospect_id") || "";
@@ -83,23 +91,26 @@ function AddVenueInner() {
     const f = e.target;
 
     // Client-side sanity checks beyond the HTML `required` attributes.
-    const capacityMin = Number(f.capacityMin.value || 0);
-    const capacityMax = Number(f.capacityMax.value || 0);
-    const startingPrice = Number(f.startingPrice.value || 0);
-    if (capacityMax < capacityMin) {
+    const priceMin = Number(f.price_min?.value || 0);
+    const priceMax = Number(f.price_max?.value || 0);
+    if (priceMin <= 0) {
       setStatus("error");
-      setErrorMsg("Max capacity must be greater than or equal to min capacity.");
+      setErrorMsg(ta.errPrice);
       return;
     }
-    if (startingPrice <= 0) {
-      setStatus("error");
-      setErrorMsg("Please enter a starting price greater than 0.");
-      return;
+    if (isVenue) {
+      const capMin = Number(f.capacityMin?.value || 0);
+      const capMax = Number(f.capacityMax?.value || 0);
+      if (capMax < capMin) {
+        setStatus("error");
+        setErrorMsg(ta.errCapacity);
+        return;
+      }
     }
     // Required authorization confirmation.
     if (!f.authorization.checked) {
       setStatus("error");
-      setErrorMsg("Please confirm that you are the owner or an authorized representative of this venue.");
+      setErrorMsg(ta.errAuth);
       return;
     }
 
@@ -110,7 +121,7 @@ function AddVenueInner() {
         const uploaded = await uploadImages(f.images.files);
         images = uploaded.length > 0 ? uploaded : [PLACEHOLDER_IMAGE];
       } catch {
-        throw new Error("Image upload failed. Please try smaller images or remove them and try again.");
+        throw new Error(ta.errImages);
       }
 
       // Optional, private verification proof (separate from public Photos).
@@ -118,22 +129,19 @@ function AddVenueInner() {
       try {
         verification_docs = await uploadProofDocs(f.proof.files);
       } catch {
-        throw new Error("Verification proof upload failed (max 5MB, image or PDF). Remove it or try again.");
+        throw new Error(ta.errProof);
       }
 
       const payload = {
         name: f.name.value,
-        type: f.type.value,
+        category_id: category,
         city: f.city.value,
         area: f.area.value,
-        indoorOutdoor: f.indoorOutdoor.value,
-        capacityMin,
-        capacityMax,
-        startingPrice,
-        halls: Number(f.halls.value || 1),
-        venueSize: Number(f.venueSize.value || 0),
+        governorate_id: f.governorate_id?.value || undefined,
+        city_id: f.city_id?.value || undefined,
+        price_min: priceMin,
+        price_max: priceMax || undefined,
         description: f.description.value,
-        suitableFor: Array.from(f.suitableFor.selectedOptions).map((o) => o.value),
         images,
         // Contact / proof details for admin verification (optional).
         owner_name: f.owner_name.value,
@@ -150,8 +158,23 @@ function AddVenueInner() {
         // Outreach attribution (server forces moderation status regardless).
         source,
         prospect_id: prospectId || undefined,
-        ...AMENITIES.reduce((acc, [key]) => ({ ...acc, [key]: f[key]?.checked || false }), {}),
       };
+      // Venue-specific fields only apply to the Venues category.
+      if (isVenue) {
+        Object.assign(payload, {
+          type: f.type.value,
+          indoorOutdoor: f.indoorOutdoor.value,
+          capacityMin: Number(f.capacityMin?.value || 0),
+          capacityMax: Number(f.capacityMax?.value || 0),
+          startingPrice: priceMin,
+          halls: Number(f.halls?.value || 1),
+          venueSize: Number(f.venueSize?.value || 0),
+          suitableFor: f.suitableFor ? Array.from(f.suitableFor.selectedOptions).map((o) => o.value) : [],
+          ...AMENITY_KEYS.reduce((acc, key) => ({ ...acc, [key]: f[key]?.checked || false }), {}),
+        });
+      } else {
+        payload.startingPrice = priceMin; // keep legacy column populated
+      }
       const res = await fetch("/api/venues", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,26 +182,25 @@ function AddVenueInner() {
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Could not save the venue. Please try again.");
+        throw new Error(data.error || ta.errSave);
       }
       setStatus("sent");
       f.reset();
     } catch (err) {
       setStatus("error");
-      setErrorMsg(err.message || "Something went wrong. Please try again.");
+      setErrorMsg(err.message || ta.errGeneric);
     }
   }
 
   if (status === "sent") {
     return (
       <div className="max-w-xl mx-auto px-5 py-24 text-center">
-        <h1 className="font-display text-3xl text-emerald mb-3">Submitted for review</h1>
-        <p className="text-ink/60">
-          Your venue has been submitted and is pending admin review. It will appear publicly once
-          our team approves it. We may contact you to verify ownership. Listing is free during launch.
+        <h1 className="font-display text-3xl text-emerald mb-3">{ta.sentTitle}</h1>
+        <p className="text-cream/60">
+          {ta.sentBody}
         </p>
-        <Link href="/venues" className="inline-block mt-6 text-sm font-semibold bg-emerald text-ivory px-6 py-3 rounded-full hover:opacity-90 transition">
-          Browse venues
+        <Link href="/venues" className="inline-block mt-6 text-sm font-semibold bg-emerald text-onnight px-6 py-3 rounded-full hover:opacity-90 transition">
+          {ta.browse}
         </Link>
       </div>
     );
@@ -186,135 +208,166 @@ function AddVenueInner() {
 
   return (
     <div className="max-w-2xl mx-auto px-5 py-14">
-      <p className="text-brass-deep text-sm font-semibold uppercase tracking-wide mb-2">For venue owners</p>
-      <h1 className="font-display text-3xl text-ink mb-2">List your venue</h1>
-      <p className="text-ink/60 mb-8">Free during launch. Takes about 3 minutes. Submissions are reviewed before going live.</p>
+      <p className="text-brass-deep text-sm font-semibold uppercase tracking-wide mb-2">{ta.eyebrow}</p>
+      <h1 className="font-display text-3xl text-cream mb-2">{ta.title}</h1>
+      <p className="text-cream/60 mb-8">{ta.subtitle}</p>
 
-      <form onSubmit={handleSubmit} className="space-y-5 bg-white border border-line rounded-2xl p-6 md:p-8">
-        <Field label="Venue name" name="name" required />
+      <form onSubmit={handleSubmit} className="space-y-5 bg-surface border border-hair rounded-2xl p-6 md:p-8">
+        <Field label={ta.venueName} name="name" required />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <Label>Venue type</Label>
-            <select name="type" required className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white">
-              {["Hotel", "Hall", "Garden", "Villa", "Rooftop", "Restaurant"].map((t) => <option key={t}>{t}</option>)}
-            </select>
-          </div>
-          <div>
-            <Label>Indoor / Outdoor</Label>
-            <select name="indoorOutdoor" required className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white">
-              <option>Indoor</option><option>Outdoor</option><option>Both</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="City" name="city" required />
-          <Field label="Area" name="area" required />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Min capacity" name="capacityMin" type="number" required />
-          <Field label="Max capacity" name="capacityMax" type="number" required />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label="Starting price (EGP)" name="startingPrice" type="number" required />
-          <Field label="Number of halls" name="halls" type="number" />
-        </div>
-
-        <Field label="Venue size (m²)" name="venueSize" type="number" />
-
+        {/* Category */}
         <div>
-          <Label>Suitable for (select all that apply)</Label>
-          <select name="suitableFor" multiple className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white h-28">
-            {["Wedding", "Engagement", "Birthday", "Corporate Event"].map((e) => <option key={e}>{e}</option>)}
+          <Label>{ta.category}</Label>
+          <select name="category_id" value={category} onChange={(e) => setCategory(e.target.value)}
+            className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+            {cats.map((c) => <option key={c.id} value={c.id}>{locale === "ar" ? c.name_ar : c.name_en}</option>)}
           </select>
         </div>
 
+        {/* Location (governorate + city from the reference tables) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Label>{ta.governorate}</Label>
+            <select name="governorate_id" value={governorate} onChange={(e) => setGovernorate(e.target.value)}
+              className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+              <option value="">—</option>
+              {govs.map((g) => <option key={g.id} value={g.id}>{locale === "ar" ? g.name_ar : g.name_en}</option>)}
+            </select>
+          </div>
+          <div>
+            <Label>{ta.cityArea}</Label>
+            <select name="city_id" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+              <option value="">—</option>
+              {cityOptions.map((c) => <option key={c.id} value={c.id}>{locale === "ar" ? c.name_ar : c.name_en}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={ta.city} name="city" required />
+          <Field label={ta.area} name="area" required />
+        </div>
+
+        {/* Price (all categories) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Field label={ta.startingPrice} name="price_min" type="number" required />
+          <Field label={ta.priceMax} name="price_max" type="number" />
+        </div>
+
+        {/* Venue-only fields */}
+        {isVenue && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label>{ta.venueType}</Label>
+                <select name="type" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+                  {["Hotel", "Hall", "Garden", "Villa", "Rooftop", "Restaurant"].map((v) => <option key={v} value={v}>{tv("type", v)}</option>)}
+                </select>
+              </div>
+              <div>
+                <Label>{ta.setting}</Label>
+                <select name="indoorOutdoor" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+                  {["Indoor", "Outdoor", "Both"].map((v) => <option key={v} value={v}>{tv("setting", v)}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={ta.minCapacity} name="capacityMin" type="number" />
+              <Field label={ta.maxCapacity} name="capacityMax" type="number" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label={ta.halls} name="halls" type="number" />
+              <Field label={ta.venueSize} name="venueSize" type="number" />
+            </div>
+            <div>
+              <Label>{ta.suitableFor}</Label>
+              <select name="suitableFor" multiple className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface h-28">
+                {["Wedding", "Engagement", "Birthday", "Corporate Event"].map((e) => <option key={e} value={e}>{tv("event", e)}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
         <div>
-          <Label>Description</Label>
-          <textarea name="description" rows={4} required className="w-full border border-line rounded-lg px-3 py-2.5 text-sm" />
+          <Label>{ta.description}</Label>
+          <textarea name="description" rows={4} required className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
         </div>
 
         <div>
-          <Label>Photos</Label>
+          <Label>{ta.photos}</Label>
           <input
             name="images"
             type="file"
             accept="image/*"
             multiple
-            className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white file:mr-3 file:rounded-full file:border-0 file:bg-emerald file:text-ivory file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+            className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface file:me-3 file:rounded-full file:border-0 file:bg-emerald file:text-cream file:px-3 file:py-1.5 file:text-xs file:font-semibold"
           />
-          <p className="text-xs text-ink/40 mt-1">Upload one or more photos. If you skip this, we&apos;ll use a placeholder you can replace later.</p>
+          <p className="text-xs text-cream/40 mt-1">{ta.photosHint}</p>
         </div>
 
-        <div>
-          <Label>Amenities</Label>
-          <div className="grid grid-cols-2 gap-2 mt-1">
-            {AMENITIES.map(([key, label]) => (
-              <label key={key} className="flex items-center gap-2 text-sm text-ink/70">
-                <input type="checkbox" name={key} className="accent-emerald" />
-                {label}
-              </label>
-            ))}
+        {isVenue && (
+          <div>
+            <Label>{ta.amenities}</Label>
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              {AMENITY_KEYS.map((key) => (
+                <label key={key} className="flex items-center gap-2 text-sm text-cream/70">
+                  <input type="checkbox" name={key} className="accent-emerald" />
+                  {t.detail.amenityLabels[key]}
+                </label>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="border-t border-line pt-5">
-          <Label>Your details (helps us verify ownership)</Label>
-          <p className="text-xs text-ink/40 mb-3">Optional, but listings with verifiable details get approved faster. Never shown publicly.</p>
+        <div className="border-t border-hair pt-5">
+          <Label>{ta.ownerDetails}</Label>
+          <p className="text-xs text-cream/40 mb-3">{ta.ownerHint}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label="Your name" name="owner_name" />
-            <Field label="Your role (owner, manager…)" name="owner_role" />
-            <Field label="Business email" name="owner_email" type="email" />
-            <Field label="Phone" name="owner_phone" type="tel" />
-            <Field label="WhatsApp number" name="owner_whatsapp" type="tel" />
-            <Field label="Official website" name="official_website" />
-            <Field label="Google Maps link" name="google_maps_link" />
+            <Field label={ta.ownerName} name="owner_name" />
+            <Field label={ta.ownerRole} name="owner_role" />
+            <Field label={ta.ownerEmail} name="owner_email" type="email" />
+            <Field label={ta.ownerPhone} name="owner_phone" type="tel" />
+            <Field label={ta.ownerWhatsapp} name="owner_whatsapp" type="tel" />
+            <Field label={ta.officialWebsite} name="official_website" />
+            <Field label={ta.googleMaps} name="google_maps_link" />
           </div>
           <div className="mt-4">
-            <Field label="Social media link (Instagram/Facebook)" name="social_link" />
+            <Field label={ta.socialLink} name="social_link" />
           </div>
 
           <div className="mt-4">
-            <Label>Verification proof (optional)</Label>
+            <Label>{ta.proof}</Label>
             <input
               name="proof"
               type="file"
               accept="image/*,application/pdf"
               multiple
-              className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white file:mr-3 file:rounded-full file:border-0 file:bg-ink file:text-ivory file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+              className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface file:me-3 file:rounded-full file:border-0 file:bg-night file:text-cream file:px-3 file:py-1.5 file:text-xs file:font-semibold"
             />
-            <p className="text-xs text-ink/40 mt-1">
-              Optional — only used for verification, never shown publicly. (Business card, authorization
-              letter, or similar — image or PDF, max 5MB each. Separate from the venue Photos above.)
-            </p>
-            <p className="text-xs text-ink/40 mt-1" dir="rtl">
-              اختياري — يُستخدم فقط للمراجعة والتوثيق، ولن يظهر للعامة.
+            <p className="text-xs text-cream/40 mt-1">
+              {ta.proofHint}
             </p>
           </div>
         </div>
 
-        <p className="text-xs text-ink/50 bg-ink/5 rounded-lg p-3">
-          Submissions are reviewed by our team before appearing publicly. Don&apos;t list a venue you don&apos;t own or represent — fake or impersonated listings are removed.
+        <p className="text-xs text-cream/50 bg-night/5 rounded-lg p-3">
+          {ta.moderationNote}
         </p>
 
-        <label className="flex items-start gap-2.5 text-sm text-ink/70">
+        <label className="flex items-start gap-2.5 text-sm text-cream/70">
           <input type="checkbox" name="authorization" required className="accent-emerald mt-0.5" />
           <span>
-            I confirm that I am the owner or an authorized representative of this venue, and that the
-            information provided is accurate. <span className="text-red-500">*</span>
+            {ta.authConfirm} <span className="text-red-500">*</span>
           </span>
         </label>
 
         <button
           disabled={status === "sending"}
-          className="w-full bg-ink text-ivory font-semibold py-3.5 rounded-full hover:bg-emerald transition disabled:opacity-50"
+          className="w-full bg-emerald text-onnight font-semibold py-3.5 rounded-full hover:opacity-90 transition disabled:opacity-50"
         >
-          {status === "sending" ? "Submitting…" : "Submit venue for review"}
+          {status === "sending" ? ta.submitting : ta.submit}
         </button>
-        {status === "error" && <p className="text-sm text-red-600 text-center">{errorMsg || "Something went wrong. Please try again."}</p>}
+        {status === "error" && <p className="text-sm text-red-600 text-center">{errorMsg || ta.errGeneric}</p>}
       </form>
     </div>
   );
@@ -322,21 +375,21 @@ function AddVenueInner() {
 
 export default function AddVenuePage() {
   return (
-    <Suspense fallback={<div className="max-w-2xl mx-auto px-5 py-14 text-ink/50">Loading…</div>}>
+    <Suspense fallback={<div className="max-w-2xl mx-auto px-5 py-14 text-cream/50">…</div>}>
       <AddVenueInner />
     </Suspense>
   );
 }
 
 function Label({ children }) {
-  return <label className="text-sm font-medium text-ink/70 block mb-1.5">{children}</label>;
+  return <label className="text-sm font-medium text-cream/70 block mb-1.5">{children}</label>;
 }
 
 function Field({ label, name, type = "text", required }) {
   return (
     <div>
       <Label>{label}</Label>
-      <input name={name} type={type} required={required} className="w-full border border-line rounded-lg px-3 py-2.5 text-sm" />
+      <input name={name} type={type} required={required} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
     </div>
   );
 }

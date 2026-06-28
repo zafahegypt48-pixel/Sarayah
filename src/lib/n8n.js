@@ -16,7 +16,7 @@
 //   never in the browser bundle (this module is server-only), never logged.
 //
 // Configure in .env.local (and Vercel):
-//   N8N_WEBHOOK_URL    = https://<you>.app.n8n.cloud/webhook/zafah-mirror
+//   N8N_WEBHOOK_URL    = https://<you>.app.n8n.cloud/webhook/hafla-mirror
 //   N8N_WEBHOOK_SECRET = <a long random string; also set in n8n Header Auth>
 
 const TIMEOUT_MS = 4000;

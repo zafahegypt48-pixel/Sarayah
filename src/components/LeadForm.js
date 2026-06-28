@@ -1,11 +1,18 @@
 "use client";
 import { useState } from "react";
 import { validateLead } from "@/lib/validation";
+import { useI18n } from "@/lib/i18n/client";
 
 export default function LeadForm({ venueId, venueName }) {
+  const { t } = useI18n();
   const [status, setStatus] = useState("idle"); // idle | sending | sent | error
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
+
+  // Map a validation error key to a localized message (validateLead returns
+  // English keys + messages; we re-localize by key, falling back to the raw
+  // message for anything unmapped).
+  const msg = (key) => t.lead.errors[key] || errors[key];
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -54,9 +61,9 @@ export default function LeadForm({ venueId, venueName }) {
   if (status === "sent") {
     return (
       <div className="bg-emerald/10 border border-emerald/30 rounded-2xl p-6 text-center">
-        <p className="font-display text-xl text-emerald mb-1">Inquiry sent</p>
-        <p className="text-sm text-ink/60">
-          {venueName} will receive your details and get back to you. You won&apos;t be contacted directly until then.
+        <p className="font-display text-xl text-emerald mb-1">{t.lead.sentTitle}</p>
+        <p className="text-sm text-cream/60">
+          {t.lead.sentBody.replace("{venue}", venueName)}
         </p>
       </div>
     );
@@ -65,61 +72,61 @@ export default function LeadForm({ venueId, venueName }) {
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Your name" name="name" error={errors.name} />
-        <Field label="Phone number" name="phone" type="tel" error={errors.phone} />
+        <Field label={t.lead.name} name="name" error={errors.name && msg("name")} />
+        <Field label={t.lead.phone} name="phone" type="tel" error={errors.phone && msg("phone")} />
       </div>
-      <Field label="Email" name="email" type="email" error={errors.email} />
+      <Field label={t.lead.email} name="email" type="email" error={errors.email && msg("email")} />
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Event date" name="eventDate" type="date" error={errors.eventDate} />
+        <Field label={t.lead.eventDate} name="eventDate" type="date" error={errors.eventDate && msg("eventDate")} />
         <div>
-          <label className="text-sm font-medium text-ink/70 block mb-1.5">Event type</label>
-          <select name="eventType" className="w-full border border-line rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-emerald/30">
-            <option value="">Select</option>
-            <option>Wedding</option>
-            <option>Engagement</option>
-            <option>Birthday</option>
-            <option>Corporate Event</option>
+          <label className="text-sm font-medium text-cream/70 block mb-1.5">{t.lead.eventType}</label>
+          <select name="eventType" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface focus:outline-none focus:ring-2 focus:ring-emerald/30">
+            <option value="">{t.lead.select}</option>
+            <option value="Wedding">{t.enums.event.Wedding}</option>
+            <option value="Engagement">{t.enums.event.Engagement}</option>
+            <option value="Birthday">{t.enums.event.Birthday}</option>
+            <option value="Corporate Event">{t.enums.event["Corporate Event"]}</option>
           </select>
-          {errors.eventType && <p className="text-xs text-red-600 mt-1">{errors.eventType}</p>}
+          {errors.eventType && <p className="text-xs text-red-600 mt-1">{msg("eventType")}</p>}
         </div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Field label="Number of guests" name="guests" type="number" error={errors.guests} />
-        <Field label="Budget (EGP)" name="budget" type="number" error={errors.budget} optional />
+        <Field label={t.lead.guests} name="guests" type="number" error={errors.guests && msg("guests")} />
+        <Field label={t.lead.budget} name="budget" type="number" error={errors.budget && msg("budget")} optionalLabel={t.lead.optional} />
       </div>
       <div>
-        <label className="text-sm font-medium text-ink/70 block mb-1.5">Notes (optional)</label>
-        <textarea name="notes" rows={3} className="w-full border border-line rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald/30" />
-        {errors.notes && <p className="text-xs text-red-600 mt-1">{errors.notes}</p>}
+        <label className="text-sm font-medium text-cream/70 block mb-1.5">{t.lead.notes}</label>
+        <textarea name="notes" rows={3} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald/30" />
+        {errors.notes && <p className="text-xs text-red-600 mt-1">{msg("notes")}</p>}
       </div>
       <button
         disabled={status === "sending"}
-        className="w-full bg-emerald text-ivory font-semibold py-3 rounded-full hover:opacity-90 transition disabled:opacity-50"
+        className="w-full bg-emerald text-onnight font-semibold py-3 rounded-full hover:opacity-90 transition disabled:opacity-50"
       >
-        {status === "sending" ? "Sending…" : "Send inquiry to venue"}
+        {status === "sending" ? t.lead.sending : t.lead.send}
       </button>
       {status === "error" && (
-        <p className="text-sm text-red-600">{serverError || "Something went wrong. Please try again."}</p>
+        <p className="text-sm text-red-600">{serverError || t.lead.error}</p>
       )}
-      <p className="text-xs text-ink/40 text-center">
-        We pass your details to the venue — they will contact you directly to confirm availability.
+      <p className="text-xs text-cream/40 text-center">
+        {t.lead.footnote}
       </p>
     </form>
   );
 }
 
-function Field({ label, name, type = "text", error, optional }) {
+function Field({ label, name, type = "text", error, optionalLabel }) {
   return (
     <div>
-      <label className="text-sm font-medium text-ink/70 block mb-1.5">
-        {label}{optional && <span className="text-ink/40 font-normal"> (optional)</span>}
+      <label className="text-sm font-medium text-cream/70 block mb-1.5">
+        {label}{optionalLabel && <span className="text-cream/40 font-normal"> {optionalLabel}</span>}
       </label>
       <input
         name={name}
         type={type}
         aria-invalid={!!error}
         className={`w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald/30 ${
-          error ? "border-red-400" : "border-line"
+          error ? "border-red-400" : "border-hair"
         }`}
       />
       {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
