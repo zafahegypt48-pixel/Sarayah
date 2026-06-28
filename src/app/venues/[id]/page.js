@@ -1,6 +1,7 @@
 import { getVenueById } from "@/lib/data";
 import LeadForm from "@/components/LeadForm";
 import ReportVenue from "@/components/ReportVenue";
+import VenueMap from "@/components/VenueMap";
 import { notFound } from "next/navigation";
 import { getI18n } from "@/lib/i18n/server";
 
@@ -95,6 +96,17 @@ export default async function VenueDetailsPage({ params }) {
               ))}
             </div>
           </div>
+
+          {/* Location map (keyless Google embed + View on Google Maps) */}
+          <VenueMap
+            name={venue.name}
+            area={venue.area}
+            city={venue.city}
+            link={venue.google_maps_link}
+            title={t.detail.location}
+            viewLabel={t.detail.viewOnMaps}
+            approxNote={t.detail.mapApprox}
+          />
 
           {/* Disclaimer + report */}
           <div className="mt-10 bg-surface border border-hair rounded-2xl p-5">

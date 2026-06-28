@@ -4,6 +4,7 @@ import LeadForm from "@/components/LeadForm";
 import ReportVenue from "@/components/ReportVenue";
 import Reviews from "@/components/Reviews";
 import FavoriteButton from "@/components/FavoriteButton";
+import VenueMap from "@/components/VenueMap";
 import { getListingBySlug, getVenueById, getCategory, getApprovedReviews, getPackages } from "@/lib/data";
 import { getI18n } from "@/lib/i18n/server";
 
@@ -150,6 +151,17 @@ export default async function ListingDetailPage({ params }) {
               </div>
             </div>
           )}
+
+          {/* Location map (keyless Google embed + View on Google Maps) */}
+          <VenueMap
+            name={listing.name}
+            area={listing.area}
+            city={listing.city}
+            link={listing.google_maps_link}
+            title={t.detail.location}
+            viewLabel={t.detail.viewOnMaps}
+            approxNote={t.detail.mapApprox}
+          />
 
           <div className="mt-10 bg-surface border border-hair rounded-2xl p-5">
             <p className="text-sm text-cream/60 leading-relaxed">{t.detail.disclaimer}</p>

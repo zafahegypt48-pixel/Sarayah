@@ -30,7 +30,6 @@ export default async function Navbar() {
         <div className="flex items-center gap-1.5">
         {/* Desktop auth */}
         <div className="hidden md:flex items-center gap-3 text-sm">
-          <Link href="/favorites" aria-label={t.fav.nav} title={t.fav.nav} className="text-cream/50 hover:text-red-500 transition text-lg leading-none">♥</Link>
           <LanguageToggle />
           {user ? (
             <>

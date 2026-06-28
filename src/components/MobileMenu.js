@@ -12,9 +12,10 @@ export default function MobileMenu({ userEmail, isAdmin }) {
 
   const LINKS = [
     ["/venues", t.nav.venues],
+    ["/services", t.nav.services],
     ["/concierge", `✦ ${t.concierge.nav}`],
     ["/search", t.nav.aiSearch],
-    ["/favorites", `♥ ${t.fav.nav}`],
+    ["/support", t.nav.support],
     ["/how-it-works", t.nav.howItWorks],
     ["/add-venue", t.nav.listVenue],
   ];

@@ -3,6 +3,7 @@ import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import BottomNav from "@/components/BottomNav";
+import WelcomeModal from "@/components/WelcomeModal";
 import { LanguageProvider } from "@/lib/i18n/client";
 import { getLocale, getTheme } from "@/lib/i18n/server";
 import { dirFor, getDictionary } from "@/lib/i18n/dictionaries";
@@ -95,6 +96,7 @@ export default async function RootLayout({ children }) {
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
           <Footer />
           <BottomNav />
+          <WelcomeModal />
         </LanguageProvider>
       </body>
     </html>

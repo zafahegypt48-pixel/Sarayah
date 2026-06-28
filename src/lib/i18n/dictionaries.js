@@ -34,6 +34,10 @@ const en = {
   nav: {
     home: "Home",
     venues: "Venues",
+    services: "Services",
+    support: "Support",
+    account: "Account",
+    notifications: "Notifications",
     aiSearch: "AI Search",
     howItWorks: "How it works",
     listVenue: "List your venue",
@@ -42,6 +46,37 @@ const en = {
     signup: "Sign up",
     logout: "Log out",
     homeAria: "Sarayah home",
+  },
+
+  services: {
+    eyebrow: "Browse by category",
+    title: "Services for your celebration",
+    subtitle: "Venues, catering, invitations, planners and more — all in one place.",
+  },
+
+  welcome: {
+    eyebrow: "Welcome",
+    title: "Welcome to Sarayah 👋",
+    subtitle: "Egypt's marketplace for wedding & event venues and vendors. To get you started — which one are you?",
+    customer: "I'm planning an event",
+    customerDesc: "Browse venues and vendors, compare them, and send inquiries — free.",
+    owner: "I have a venue or business",
+    ownerDesc: "List it on Sarayah and reach couples — free during launch.",
+    skip: "Maybe later",
+  },
+
+  notifications: {
+    title: "Notifications",
+    aria: "Notifications",
+    empty: "You're all caught up — no new notifications.",
+    markAll: "Mark all as read",
+    unread: "{n} new",
+    items: {
+      welcome: { title: "Welcome to Sarayah 🎉", body: "Browse venues and send your first inquiry — it's free." },
+      signin: { title: "Sign in to save favorites", body: "Log in to save listings and track your inquiries." },
+      planner: { title: "Try the AI Planner", body: "Tell us your budget and guests, and we'll build a shortlist." },
+      favorites: { title: "Save your favorites", body: "Tap the heart on any listing to find it later in Settings." },
+    },
   },
 
   footer: {
@@ -139,6 +174,9 @@ const en = {
     disclaimer:
       "Sarayah helps you discover and contact venues. Confirm availability, prices, contracts, and payment terms directly with the venue before making any payment.",
     startingPrice: "Starting price",
+    location: "Location",
+    viewOnMaps: "View on Google Maps",
+    mapApprox: "Approximate area — confirm the exact address with the venue.",
     sendInquiryTitle: "Send a booking inquiry",
     amenityLabels: {
       catering: "Catering",
@@ -585,6 +623,16 @@ const en = {
     pwShort: "Password must be at least 8 characters.",
     saveError: "Couldn't save — please try again.",
     privacyNote: "We never sell your data. You control your inquiries and reviews.",
+    favorites: "Favorites",
+    favoritesDesc: "Listings you've saved.",
+    viewFavorites: "View favorites",
+    notifications: "Notifications",
+    notifInquiries: "Inquiry updates",
+    notifInquiriesDesc: "When a venue responds to your inquiry.",
+    notifPromotions: "Tips & offers",
+    notifPromotionsDesc: "Occasional product tips and launch offers.",
+    notifSaved: "Notification preferences saved ✓",
+    loginToManage: "Log in to manage your account and favorites.",
   },
 
   support: {
@@ -593,13 +641,20 @@ const en = {
     aria: "Support",
     greeting: "Hi! 👋 I'm Sarayah's assistant. Ask me anything — how inquiries work, listing your business, or finding the right venue.",
     placeholder: "Type your question…",
-    send: "Search",
+    send: "Send",
     thinking: "Typing…",
     fallback: "Our AI assistant isn't enabled yet — but the FAQ covers most questions, and you can always reach a human via Contact.",
     error: "Sorry, something went wrong. Please try the Contact page.",
     faqLink: "Read the FAQ",
     contactLink: "Contact us",
     aiBadge: "AI",
+    back: "Back",
+    suggestions: [
+      "How do inquiries work?",
+      "How do I list my business?",
+      "Does Sarayah take payments?",
+      "What does the Verified badge mean?",
+    ],
   },
 
   enums: {
@@ -629,6 +684,10 @@ const ar = {
   nav: {
     home: "الرئيسية",
     venues: "الأماكن",
+    services: "الخدمات",
+    support: "الدعم",
+    account: "حسابي",
+    notifications: "الإشعارات",
     aiSearch: "بحث ذكي",
     howItWorks: "كيف يعمل",
     listVenue: "أضف مكانك",
@@ -637,6 +696,37 @@ const ar = {
     signup: "إنشاء حساب",
     logout: "تسجيل الخروج",
     homeAria: "الصفحة الرئيسية لـ Sarayah",
+  },
+
+  services: {
+    eyebrow: "تصفّح حسب الفئة",
+    title: "خدمات لمناسبتك",
+    subtitle: "أماكن، بوفيه، دعوات، منظّمون والمزيد — كلها في مكان واحد.",
+  },
+
+  welcome: {
+    eyebrow: "أهلًا بك",
+    title: "أهلًا بك في Sarayah 👋",
+    subtitle: "سوق مصر لأماكن ومزوّدي الأفراح والمناسبات. لنبدأ — أنت أيهما؟",
+    customer: "أخطّط لمناسبة",
+    customerDesc: "تصفّح الأماكن والمزوّدين، قارن بينهم، وأرسل طلبات — مجانًا.",
+    owner: "لديّ مكان أو نشاط",
+    ownerDesc: "أضفه على Sarayah وتواصل مع العرسان — مجانًا خلال الإطلاق.",
+    skip: "ربما لاحقًا",
+  },
+
+  notifications: {
+    title: "الإشعارات",
+    aria: "الإشعارات",
+    empty: "لا توجد إشعارات جديدة.",
+    markAll: "تحديد الكل كمقروء",
+    unread: "{n} جديد",
+    items: {
+      welcome: { title: "مرحبًا بك في Sarayah 🎉", body: "تصفّح الأماكن وأرسل أول طلب — مجانًا." },
+      signin: { title: "سجّل الدخول لحفظ المفضلة", body: "سجّل الدخول لحفظ القوائم ومتابعة طلباتك." },
+      planner: { title: "جرّب المخطط الذكي", body: "أخبرنا بميزانيتك وعدد ضيوفك وسنجهّز لك قائمة مختصرة." },
+      favorites: { title: "احفظ مفضّلاتك", body: "اضغط القلب على أي قائمة لتجدها لاحقًا في الإعدادات." },
+    },
   },
 
   footer: {
@@ -734,6 +824,9 @@ const ar = {
     disclaimer:
       "Sarayah تساعدك على اكتشاف الأماكن والتواصل معها. تأكد من التوافر والأسعار وشروط الحجز والدفع مباشرةً مع المكان قبل دفع أي مبالغ.",
     startingPrice: "السعر يبدأ من",
+    location: "الموقع",
+    viewOnMaps: "عرض على خرائط جوجل",
+    mapApprox: "منطقة تقريبية — أكّد العنوان الدقيق مع المكان.",
     sendInquiryTitle: "أرسل طلب حجز",
     amenityLabels: {
       catering: "بوفيه",
@@ -1179,6 +1272,16 @@ const ar = {
     pwShort: "يجب أن تكون كلمة المرور 8 أحرف على الأقل.",
     saveError: "تعذّر الحفظ — من فضلك حاول مجددًا.",
     privacyNote: "لا نبيع بياناتك أبدًا. أنت تتحكم في طلباتك وتقييماتك.",
+    favorites: "المفضلة",
+    favoritesDesc: "القوائم التي حفظتها.",
+    viewFavorites: "عرض المفضلة",
+    notifications: "الإشعارات",
+    notifInquiries: "تحديثات الطلبات",
+    notifInquiriesDesc: "عندما يرد مكان على طلبك.",
+    notifPromotions: "نصائح وعروض",
+    notifPromotionsDesc: "نصائح عن المنصة وعروض الإطلاق من حين لآخر.",
+    notifSaved: "تم حفظ تفضيلات الإشعارات ✓",
+    loginToManage: "سجّل الدخول لإدارة حسابك ومفضّلاتك.",
   },
 
   support: {
@@ -1187,13 +1290,20 @@ const ar = {
     aria: "الدعم",
     greeting: "أهلًا! 👋 أنا مساعد Sarayah. اسألني أي شيء — كيف تعمل الطلبات، أو إضافة نشاطك، أو إيجاد المكان المناسب.",
     placeholder: "اكتب سؤالك…",
-    send: "بحث",
+    send: "إرسال",
     thinking: "يكتب…",
     fallback: "مساعد الذكاء الاصطناعي غير مُفعّل بعد — لكن الأسئلة الشائعة تغطي معظم الاستفسارات، ويمكنك دائمًا التواصل معنا عبر صفحة «تواصل معنا».",
     error: "عذرًا، حدث خطأ ما. من فضلك جرّب صفحة التواصل.",
     faqLink: "اقرأ الأسئلة الشائعة",
     contactLink: "تواصل معنا",
     aiBadge: "ذكاء اصطناعي",
+    back: "رجوع",
+    suggestions: [
+      "كيف تعمل الطلبات؟",
+      "كيف أضيف نشاطي؟",
+      "هل تأخذ Sarayah مدفوعات؟",
+      "ماذا تعني شارة موثّق؟",
+    ],
   },
 
   enums: {
