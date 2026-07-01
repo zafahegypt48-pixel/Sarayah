@@ -56,9 +56,13 @@ export default function BottomNav() {
             <li key={tab.href}>
               <Link
                 href={tab.href}
-                className={`flex flex-col items-center gap-1 py-2 ${active ? "text-brass" : "text-onnight/60"}`}
+                className={`relative flex flex-col items-center gap-1 py-2 transition-colors ${active ? "text-brass" : "text-onnight/60"}`}
               >
-                <Icon>{tab.icon}</Icon>
+                {/* Animated active-tab pill (slides/scales in). */}
+                <span className={`absolute top-0 inset-x-4 h-0.5 rounded-full bg-brass transition-transform duration-300 ease-out ${active ? "scale-x-100" : "scale-x-0"}`} />
+                <span className={`transition-transform duration-300 ${active ? "-translate-y-0.5" : ""}`}>
+                  <Icon>{tab.icon}</Icon>
+                </span>
                 <span className="text-[10px] font-medium leading-none">{tab.label}</span>
               </Link>
             </li>

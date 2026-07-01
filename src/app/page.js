@@ -38,7 +38,7 @@ export default async function Home() {
           <img
             src="https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1800&q=80"
             alt=""
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover hero-kenburns"
           />
         </div>
         <div className="relative max-w-6xl mx-auto px-5 py-28 md:py-36">
@@ -58,7 +58,7 @@ export default async function Home() {
                 placeholder={t.home.searchPlaceholder}
                 className="flex-1 bg-transparent text-cream placeholder:text-cream/40 text-sm focus:outline-none"
               />
-              <button className="bg-emerald text-onnight text-sm font-semibold px-5 py-3 rounded-full hover:opacity-90 transition shrink-0">
+              <button className="btn-shine bg-emerald text-onnight text-sm font-semibold px-5 py-3 rounded-full hover:opacity-90 transition active:scale-[0.98] shrink-0">
                 {t.home.searchButton}
               </button>
             </div>
@@ -128,7 +128,7 @@ export default async function Home() {
           </div>
           <Link
             href="/add-venue"
-            className="bg-brass text-night font-semibold px-7 py-3.5 rounded-full hover:bg-brass-deep transition shrink-0"
+            className="btn-shine bg-brass text-night font-semibold px-7 py-3.5 rounded-full hover:bg-brass-deep transition active:scale-[0.98] shrink-0"
           >
             {t.home.ownerButton}
           </Link>

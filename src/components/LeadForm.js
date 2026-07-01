@@ -60,7 +60,12 @@ export default function LeadForm({ venueId, venueName }) {
 
   if (status === "sent") {
     return (
-      <div className="bg-emerald/10 border border-emerald/30 rounded-2xl p-6 text-center">
+      <div className="bg-emerald/10 border border-emerald/30 rounded-2xl p-6 text-center animate-fade-up">
+        <span className="check-circle mx-auto mb-3 flex items-center justify-center w-14 h-14 rounded-full bg-emerald text-onnight">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7" aria-hidden="true">
+            <path className="check-path" d="M20 6L9 17l-5-5" />
+          </svg>
+        </span>
         <p className="font-display text-xl text-emerald mb-1">{t.lead.sentTitle}</p>
         <p className="text-sm text-cream/60">
           {t.lead.sentBody.replace("{venue}", venueName)}
@@ -101,7 +106,7 @@ export default function LeadForm({ venueId, venueName }) {
       </div>
       <button
         disabled={status === "sending"}
-        className="w-full bg-emerald text-onnight font-semibold py-3 rounded-full hover:opacity-90 transition disabled:opacity-50"
+        className="btn-shine w-full bg-emerald text-onnight font-semibold py-3 rounded-full hover:opacity-90 transition active:scale-[0.99] disabled:opacity-50"
       >
         {status === "sending" ? t.lead.sending : t.lead.send}
       </button>
