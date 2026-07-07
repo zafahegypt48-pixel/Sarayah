@@ -123,9 +123,15 @@ export async function POST(request) {
   // Starting price doubles as the listing's price_min if not given explicitly.
   if (!venue.price_min && venue.startingPrice) venue.price_min = venue.startingPrice;
   venue.authorization_confirmed = true;
-  // If the submitter is logged in, they OWN this listing (vendor self-service).
+  // If the submitter is logged in, they OWN this listing (vendor self-service):
+  // stamp the authenticated user UUID, and default owner_email to their verified
+  // account email when they left it blank — so the listing is ALWAYS linkable to
+  // them (directly by id, and re-claimable by email after a later login).
   const submitter = await getCurrentUser();
-  if (submitter) venue.claimed_by_user_id = submitter.id;
+  if (submitter) {
+    venue.claimed_by_user_id = submitter.id;
+    if (!venue.owner_email && submitter.email) venue.owner_email = submitter.email;
+  }
   // App-generated id so Supabase and any downstream mirror (n8n → Sheet) share the
   // same key (anon can't read the DB-generated id back through RLS).
   venue.id = "v" + randomUUID().replace(/-/g, "");
