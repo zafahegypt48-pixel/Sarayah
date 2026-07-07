@@ -1,5 +1,6 @@
 import { vendorClaimVenue, vendorMyClaims } from "@/lib/data";
 import { getUserContext } from "@/lib/auth";
+import { notifyNewClaim } from "@/lib/notify";
 
 // Submit a claim for a listing (by its link or slug/id). The RPC decides:
 // auto-claim on verified-email match, else a pending admin-reviewed request.
@@ -13,6 +14,14 @@ export async function POST(request) {
   const ident = raw.replace(/[?#].*$/, "").replace(/\/+$/, "").split("/").pop();
   try {
     const result = await vendorClaimVenue(ident, ctx.supabase);
+    // Alert admins on a new claim (fire-and-forget; never blocks the response).
+    if (result?.status === "pending" || result?.reason === "email_match") {
+      notifyNewClaim({
+        venueId: result.venue_id,
+        claimantEmail: ctx.user.email,
+        matched: result.reason === "email_match",
+      }).catch((e) => console.error("Claim notify failed:", e.message));
+    }
     return Response.json(result);
   } catch (err) {
     console.error("Claim submit failed:", err.message);

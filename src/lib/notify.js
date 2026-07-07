@@ -96,6 +96,24 @@ export function notifyNewVenueSubmission(venue) {
   });
 }
 
+// A vendor/user filed a claim on an existing listing — pending admin review.
+export function notifyNewClaim({ venueName, venueId, claimantEmail, matched }) {
+  const html = `
+    <h2 style="font-family:sans-serif">New venue claim — ${matched ? "auto-approved" : "pending review"}</h2>
+    <table style="font-family:sans-serif;border-collapse:collapse" cellpadding="6">
+      <tr><td><b>Listing</b></td><td>${fmt(venueName || venueId)}</td></tr>
+      <tr><td><b>Requested by</b></td><td>${fmt(claimantEmail)}</td></tr>
+      <tr><td><b>Ownership proof</b></td><td>${matched ? "Email matched (auto-claimed)" : "Not proven — needs admin approval"}</td></tr>
+    </table>
+    <p style="font-family:sans-serif">Open the Sarayah admin dashboard → Claims to review the full request.</p>`;
+  return sendEmail({
+    to: adminRecipients(),
+    subject: `Venue claim: ${venueName || venueId} — ${matched ? "auto" : "pending"}`,
+    html,
+    context: "new claim (admin)",
+  });
+}
+
 // --- Confirmations to submitters -----------------------------------------
 
 export function notifyContactMessage(msg) {

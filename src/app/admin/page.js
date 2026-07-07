@@ -43,6 +43,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
+  const [reviewingClaim, setReviewingClaim] = useState(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -104,7 +105,8 @@ export default function AdminPage() {
     });
     if (!res.ok) { alert("Action failed."); return; }
     setClaims((cs) => cs.map((c) => (c.id === id ? { ...c, status: approve ? "approved" : "rejected" } : c)));
-    // A newly-approved claim assigns ownership — refresh venues so the change is reflected.
+    setReviewingClaim(null);
+    // A newly-approved claim assigns ownership — refresh so venues + claims reflect it.
     if (approve) loadAll();
   }
 
@@ -386,35 +388,64 @@ export default function AdminPage() {
       {!loading && !error && tab === "claims" && (
         <>
           <p className="text-xs text-cream/40 mb-3">
-            Ownership requests where the vendor&apos;s login email did not match the listing&apos;s owner email.
-            Verify the requester genuinely owns the venue (callback to the official public number / business email)
-            before approving — approval assigns the listing to their account.
+            Ownership requests. Open a request to review the full vendor + venue detail and documents.
+            Verify the requester genuinely owns the venue (callback to the official public number / business
+            email) before approving — approval assigns the listing to their account.
           </p>
           <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
-            <table className="w-full text-sm min-w-[720px]">
+            <table className="w-full text-sm min-w-[820px]">
               <thead className="bg-night text-onnight text-xs uppercase">
-                <tr>{["Listing", "Requested by", "Requested", "Actions"].map((h) => (
+                <tr>{["Listing", "Requested by", "Proof", "Status", "Requested", "Actions"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
               </thead>
               <tbody>
                 {claims.length === 0 && (
-                  <tr><td colSpan={4} className="text-center py-10 text-cream/40">No pending claim requests.</td></tr>
+                  <tr><td colSpan={6} className="text-center py-10 text-cream/40">No claim requests yet.</td></tr>
                 )}
-                {claims.map((c) => (
-                  <tr key={c.id} className="border-t border-hair align-middle">
-                    <td className="px-4 py-3 font-medium">{c.venue_name || c.venue_id}</td>
-                    <td className="px-4 py-3">{c.claimant_email || "—"}</td>
-                    <td className="px-4 py-3 text-cream/50 whitespace-nowrap text-xs">{fmtDateTime(c.created_at)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <button onClick={() => decideClaim(c.id, true)} className="text-xs font-semibold text-emerald hover:underline mr-3">Approve</button>
-                      <button onClick={() => decideClaim(c.id, false)} className="text-xs font-semibold text-red-600 hover:underline">Reject</button>
-                    </td>
-                  </tr>
-                ))}
+                {claims.map((c) => {
+                  const st = c.status || "pending";
+                  const stStyle = st === "approved" || st === "auto" ? "bg-emerald/10 text-emerald"
+                    : st === "rejected" ? "bg-red-100 text-red-700" : "bg-brass/20 text-brass-deep";
+                  return (
+                    <tr key={c.id} className="border-t border-hair align-middle">
+                      <td className="px-4 py-3 font-medium">{c.venue?.name || c.venue_id}</td>
+                      <td className="px-4 py-3">
+                        <div>{c.claimant?.email || "—"}</div>
+                        {c.claimant?.full_name && <div className="text-xs text-cream/45">{c.claimant.full_name}</div>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {c.email_matches
+                          ? <span className="text-xs font-semibold text-emerald">✓ Email match</span>
+                          : <span className="text-xs text-cream/40">Unverified</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-semibold rounded-full px-2.5 py-1 capitalize ${stStyle}`}>{st}</span>
+                      </td>
+                      <td className="px-4 py-3 text-cream/50 whitespace-nowrap text-xs">{fmtDateTime(c.created_at)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <button onClick={() => setReviewingClaim(c)} className="text-xs font-semibold text-cream/80 hover:underline mr-3">Review</button>
+                        {st === "pending" && (
+                          <>
+                            <button onClick={() => decideClaim(c.id, true)} className="text-xs font-semibold text-emerald hover:underline mr-2">Approve</button>
+                            <button onClick={() => decideClaim(c.id, false)} className="text-xs font-semibold text-red-600 hover:underline">Reject</button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </>
+      )}
+
+      {reviewingClaim && (
+        <ClaimReviewModal
+          claim={reviewingClaim}
+          onClose={() => setReviewingClaim(null)}
+          onDecide={decideClaim}
+        />
       )}
 
       {editing && (
@@ -665,6 +696,191 @@ function SelectField({ label, value, options, onChange }) {
         className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
         {options.map((o) => <option key={o}>{o}</option>)}
       </select>
+    </div>
+  );
+}
+
+// Read-only row for the claim review modal.
+function Row({ label, value, mono }) {
+  const empty = value === undefined || value === null || value === "";
+  return (
+    <div>
+      <div className="text-xs text-cream/45">{label}</div>
+      <div className={`text-sm ${empty ? "text-cream/30" : "text-cream/85"} break-all ${mono ? "font-mono text-xs" : ""}`}>
+        {empty ? "—" : String(value)}
+      </div>
+    </div>
+  );
+}
+
+// Full claim review: every submitted detail (claimant account/profile, complete
+// venue row, contact + proof, uploaded documents) with Accept / Reject.
+function ClaimReviewModal({ claim, onClose, onDecide }) {
+  const c = claim || {};
+  const cl = c.claimant || {};
+  const v = c.venue || {};
+  const [busy, setBusy] = useState(false);
+  const pending = (c.status || "pending") === "pending";
+  const docs = Array.isArray(v.verification_docs) ? v.verification_docs : [];
+  const images = Array.isArray(v.images) ? v.images : [];
+  const waNumber = (v.owner_whatsapp || v.owner_phone || "").replace(/[^\d]/g, "");
+
+  async function viewDoc(path) {
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { data, error } = await supabase.storage.from("venue-docs").createSignedUrl(path, 120);
+      if (error || !data?.signedUrl) throw error || new Error("no url");
+      window.open(data.signedUrl, "_blank", "noopener");
+    } catch {
+      alert("Could not open document.");
+    }
+  }
+
+  async function decide(approve) {
+    setBusy(true);
+    await onDecide(c.id, approve);
+    setBusy(false);
+  }
+
+  return (
+    <div className="fixed inset-0 bg-night/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-canvas rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-display text-2xl text-cream">Review claim</h2>
+          <button onClick={onClose} className="text-cream/40 hover:text-cream text-xl">✕</button>
+        </div>
+        <div className="flex items-center gap-2 mb-5 text-xs">
+          <span className={`font-semibold rounded-full px-2.5 py-1 capitalize ${
+            c.status === "approved" || c.status === "auto" ? "bg-emerald/10 text-emerald"
+              : c.status === "rejected" ? "bg-red-100 text-red-700" : "bg-brass/20 text-brass-deep"}`}>
+            {c.status || "pending"}
+          </span>
+          {c.email_matches
+            ? <span className="font-semibold text-emerald">✓ Login email matches owner email</span>
+            : <span className="text-cream/50">Ownership not proven by email — verify independently</span>}
+          <span className="text-cream/40 ml-auto">Filed {fmtDateTime(c.created_at)}</span>
+        </div>
+
+        {/* Claimant account + profile */}
+        <div className="bg-surface border border-hair rounded-xl p-4 mb-4">
+          <p className="text-xs font-semibold text-cream/50 uppercase tracking-wide mb-3">Requesting account</p>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+            <Row label="Account email" value={cl.email} />
+            <Row label="Display name" value={cl.full_name} />
+            <Row label="Phone" value={cl.phone} />
+            <Row label="Profile role" value={cl.role} />
+            <Row label="Locale" value={cl.locale} />
+            <Row label="User ID" value={cl.user_id} mono />
+          </div>
+        </div>
+
+        {/* Venue / listing */}
+        <div className="bg-surface border border-hair rounded-xl p-4 mb-4">
+          <p className="text-xs font-semibold text-cream/50 uppercase tracking-wide mb-3">Listing</p>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+            <Row label="Name" value={v.name} />
+            <Row label="Type" value={v.type} />
+            <Row label="City" value={v.city} />
+            <Row label="Area" value={v.area} />
+            <Row label="Status" value={v.status} />
+            <Row label="Verification" value={v.verification_status} />
+            <Row label="Venue ID" value={v.id} mono />
+            <Row label="Slug" value={v.slug} mono />
+            <Row label="Currently claimed by" value={v.claimed_by_user_id} mono />
+            <Row label="Submitted" value={v.created_at ? fmtDateTime(v.created_at) : ""} />
+          </div>
+          {(v.slug || v.id) && (
+            <a href={`/listing/${v.slug || v.id}`} target="_blank" rel="noopener noreferrer"
+              className="inline-block mt-3 text-xs font-semibold text-emerald hover:underline">Open public listing ↗</a>
+          )}
+        </div>
+
+        {/* Owner-submitted contact + proof */}
+        <div className="bg-surface border border-hair rounded-xl p-4 mb-4">
+          <p className="text-xs font-semibold text-cream/50 uppercase tracking-wide mb-3">Owner contact &amp; proof (as submitted)</p>
+          <p className="text-xs mb-3">
+            Authorization confirmed:{" "}
+            {v.authorization_confirmed
+              ? <span className="text-emerald font-semibold">Yes</span>
+              : <span className="text-red-600 font-semibold">No</span>}
+          </p>
+          <div className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
+            <Row label="Owner name" value={v.owner_name} />
+            <Row label="Owner role" value={v.owner_role} />
+            <Row label="Owner email" value={v.owner_email} />
+            <Row label="Owner phone" value={v.owner_phone} />
+            <Row label="Owner WhatsApp" value={v.owner_whatsapp} />
+            <Row label="Official website" value={v.official_website} />
+            <Row label="Google Maps" value={v.google_maps_link} />
+            <Row label="Social link" value={v.social_link} />
+            <Row label="Verification method" value={v.verification_method} />
+            <Row label="Verification notes" value={v.verification_notes} />
+          </div>
+          {v.admin_notes && (
+            <div className="mt-3"><Row label="Admin notes" value={v.admin_notes} /></div>
+          )}
+          <div className="flex flex-wrap gap-2 mt-4">
+            <a href={waNumber ? `https://wa.me/${waNumber}` : undefined} target="_blank" rel="noopener noreferrer"
+              className={`text-xs font-semibold px-3 py-2 rounded-full ${waNumber ? "bg-emerald text-onnight hover:opacity-90" : "bg-night/10 text-cream/30 pointer-events-none"}`}>WhatsApp</a>
+            <a href={v.owner_phone ? `tel:${v.owner_phone}` : undefined}
+              className={`text-xs font-semibold px-3 py-2 rounded-full ${v.owner_phone ? "bg-night text-onnight hover:opacity-90" : "bg-night/10 text-cream/30 pointer-events-none"}`}>Call</a>
+            <a href={v.owner_email ? `mailto:${v.owner_email}` : undefined}
+              className={`text-xs font-semibold px-3 py-2 rounded-full ${v.owner_email ? "bg-brass-deep text-onnight hover:opacity-90" : "bg-night/10 text-cream/30 pointer-events-none"}`}>Email</a>
+          </div>
+        </div>
+
+        {/* Uploaded documents + images */}
+        <div className="bg-surface border border-hair rounded-xl p-4 mb-5">
+          <p className="text-xs font-semibold text-cream/50 uppercase tracking-wide mb-3">Uploaded documents &amp; files</p>
+          {docs.length === 0 && images.length === 0 && (
+            <p className="text-sm text-cream/40">No documents or images were uploaded for this listing.</p>
+          )}
+          {docs.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs text-cream/50 mb-1">Private verification documents (admin-only):</p>
+              <div className="flex flex-wrap gap-2">
+                {docs.map((p, i) => (
+                  <button key={p} type="button" onClick={() => viewDoc(p)}
+                    className="text-xs font-semibold bg-night text-onnight px-3 py-1.5 rounded-full hover:opacity-90">
+                    View document {i + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          {images.length > 0 && (
+            <div>
+              <p className="text-xs text-cream/50 mb-1">Listing images:</p>
+              <div className="flex flex-wrap gap-2">
+                {images.map((src, i) => (
+                  <a key={i} href={src} target="_blank" rel="noopener noreferrer"
+                    className="text-xs font-semibold text-emerald hover:underline">Image {i + 1} ↗</a>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <p className="text-xs text-cream/40 mb-4">
+          Approving assigns this listing to the requesting account (sets its owner). Verify ownership independently
+          before approving. Rejecting leaves ownership unchanged.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="px-5 py-2.5 text-sm font-semibold text-cream/60 hover:text-cream">Close</button>
+          {pending && (
+            <>
+              <button onClick={() => decide(false)} disabled={busy}
+                className="px-5 py-2.5 text-sm font-semibold text-red-600 border border-red-200 rounded-full hover:bg-red-50 disabled:opacity-50">
+                Reject
+              </button>
+              <button onClick={() => decide(true)} disabled={busy}
+                className="px-6 py-2.5 text-sm font-semibold bg-emerald text-onnight rounded-full hover:opacity-90 disabled:opacity-50">
+                {busy ? "Working…" : "Approve & assign"}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
