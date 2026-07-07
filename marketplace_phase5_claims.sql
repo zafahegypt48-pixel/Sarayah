@@ -165,7 +165,18 @@ begin
   select * into c from public.venue_claims where id = p_claim_id;
   if c.id is null then return jsonb_build_object('status','error','reason','not_found'); end if;
   if p_approve then
-    update public.venues set claimed_by_user_id = c.user_id where id = c.venue_id;
+    -- Assign ownership AND publish the listing. Approving a claim means an admin
+    -- has vetted this owner + venue, so a still-unreviewed listing goes live and
+    -- stops showing as "Pending review" in the vendor's My listings. Only a
+    -- not-yet-live (pending_review / null) venue is promoted — an intentionally
+    -- suspended or rejected venue is left as-is (assign ownership only).
+    update public.venues
+      set claimed_by_user_id = c.user_id,
+          status       = case when coalesce(status, 'pending_review') = 'pending_review'
+                              then 'approved' else status end,
+          approved_at  = case when coalesce(status, 'pending_review') = 'pending_review'
+                              then now() else approved_at end
+      where id = c.venue_id;
     update public.venue_claims set status = 'approved' where id = p_claim_id;
     return jsonb_build_object('status','approved','venue_id',c.venue_id,'user_id',c.user_id);
   else
