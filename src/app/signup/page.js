@@ -38,11 +38,21 @@ export default function SignupPage() {
       },
     });
     setLoading(false);
+    // Surface ANY Supabase error verbatim (rate limits, invalid email, SMTP
+    // failures, "Supabase not configured", etc.) — never fail silently.
     if (error) {
       setError(error.message);
       return;
     }
-    // If email confirmation is on, there's no active session yet.
+    // Anti-enumeration: Supabase returns a user with an EMPTY identities array
+    // when the email is ALREADY registered. Detect it and say so, instead of the
+    // misleading "check your email" (which would never arrive).
+    const identities = data?.user?.identities;
+    if (Array.isArray(identities) && identities.length === 0) {
+      setError(ts.alreadyRegistered);
+      return;
+    }
+    // Confirmation on → no session yet → tell them to check email (incl. spam).
     if (!data.session) {
       setMessage(ts.confirmEmail);
       return;
