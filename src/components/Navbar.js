@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getCurrentUser, isAdminEmail } from "@/lib/auth";
+import { getCurrentUser, getAdminUser } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
 import MobileMenu from "@/components/MobileMenu";
 import LanguageToggle from "@/components/LanguageToggle";
@@ -9,7 +9,8 @@ import { getI18n } from "@/lib/i18n/server";
 
 export default async function Navbar() {
   const user = await getCurrentUser();
-  const admin = user && isAdminEmail(user.email);
+  // DB-authoritative: admin iff the JWT email is in public.admins (via is_admin()).
+  const admin = user ? await getAdminUser() : null;
   const { t } = await getI18n();
 
   return (

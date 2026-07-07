@@ -202,6 +202,17 @@ function AccountPanel({ user, supabase, s, onLogout }) {
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  // DB-authoritative admin check: ask Postgres whether this session is in
+  // public.admins (via is_admin()). Never trusts hardcoded emails / env vars.
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    supabase.rpc("is_admin").then(({ data }) => {
+      if (active) setIsAdmin(data === true);
+    });
+    return () => { active = false; };
+  }, [supabase]);
 
   async function saveProfile() {
     setBusy(true); setMsg("");
@@ -245,6 +256,9 @@ function AccountPanel({ user, supabase, s, onLogout }) {
       {msg && <p className="text-xs text-emerald">{msg}</p>}
 
       <div className="flex flex-wrap gap-2 pt-1">
+        {isAdmin && (
+          <Link href="/admin" className="px-4 py-2 rounded-full text-sm font-semibold bg-emerald text-onnight hover:opacity-90 transition">{s.adminDashboard || "Admin dashboard"}</Link>
+        )}
         <Link href="/vendor/dashboard" className="px-4 py-2 rounded-full text-sm font-semibold bg-surface border border-hair text-cream hover:border-emerald/50 transition">{s.vendorDashboard}</Link>
         <button onClick={onLogout} className="px-4 py-2 rounded-full text-sm font-semibold bg-surface border border-hair text-cream hover:border-red-400/50 transition">{s.logout}</button>
       </div>

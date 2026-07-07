@@ -65,19 +65,17 @@ end; $$;
 revoke execute on function public.vendor_update_listing(text, jsonb) from public, anon;
 grant execute on function public.vendor_update_listing(text, jsonb) to authenticated;
 
--- The inquiries (leads) that belong to a vendor's listings. Matches the same
--- ownership rule as vendor_list_listings (claimed_by_user_id OR owner_email =
--- the caller's own verified email) so leads show even before the back-fill runs.
+-- The inquiries (leads) that belong to a vendor's listings. STRICT ownership:
+-- a lead is visible only when its venue is ASSIGNED to the caller
+-- (venues.claimed_by_user_id = auth.uid()). A venue that is only a PENDING claim
+-- (claimed_by_user_id still null) shows no inquiries until an admin approves it
+-- and assigns ownership. A vendor can therefore never see another vendor's leads.
 create or replace function public.vendor_list_leads()
 returns setof public.leads
 language sql security definer set search_path = public stable as $$
   select l.* from public.leads l
   join public.venues v on v.id = l."venueId"
   where v.claimed_by_user_id = auth.uid()
-     or (
-       v.owner_email is not null
-       and lower(trim(v.owner_email)) = lower((select trim(email) from auth.users where id = auth.uid()))
-     )
   order by l."createdAt" desc;
 $$;
 revoke execute on function public.vendor_list_leads() from public, anon;
