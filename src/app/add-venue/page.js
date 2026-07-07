@@ -4,23 +4,31 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useI18n } from "@/lib/i18n/client";
+import {
+  compressImageToFit, MAX_IMAGE_BYTES, MAX_DOC_BYTES, MAX_IMAGES, MAX_DOCS, formatMB,
+} from "@/lib/upload";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1200&q=80";
 
 // Upload selected files to Supabase Storage and return their public URLs.
-// Falls back to [] if Supabase isn't configured or any upload fails.
-async function uploadImages(files) {
+// Falls back to [] if Supabase isn't configured. Large photos are optimised
+// (downscaled + re-encoded) client-side to fit MAX_IMAGE_BYTES without visible
+// quality loss; anything that still exceeds the limit throws `oversizeError`.
+async function uploadImages(files, oversizeError) {
   if (!files || files.length === 0) return [];
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  if (files.length > MAX_IMAGES) throw new Error("__count_images__");
   const supabase = createSupabaseBrowserClient();
   const urls = [];
-  for (const file of files) {
-    const ext = file.name.split(".").pop();
+  for (const original of files) {
+    const file = await compressImageToFit(original, { maxBytes: MAX_IMAGE_BYTES });
+    if (file.size > MAX_IMAGE_BYTES) throw new Error(oversizeError);
+    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
     const path = `${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage
       .from("venue-images")
-      .upload(path, file, { cacheControl: "3600", upsert: false });
+      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
     if (error) throw error;
     const { data } = supabase.storage.from("venue-images").getPublicUrl(path);
     urls.push(data.publicUrl);
@@ -31,12 +39,15 @@ async function uploadImages(files) {
 // Upload OPTIONAL verification proof to the PRIVATE `venue-docs` bucket. These are
 // NOT public — only admins can read them (via signed URLs). Returns object paths
 // (not public URLs). Separate from venue Photos above.
-async function uploadProofDocs(files) {
+async function uploadProofDocs(files, oversizeError) {
   if (!files || files.length === 0) return [];
   if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
+  if (files.length > MAX_DOCS) throw new Error("__count_docs__");
   const supabase = createSupabaseBrowserClient();
   const paths = [];
   for (const file of files) {
+    // Documents (incl. PDFs) are uploaded as-is — validate size, never re-encode.
+    if (file.size > MAX_DOC_BYTES) throw new Error(oversizeError);
     const ext = (file.name.split(".").pop() || "dat").toLowerCase();
     const path = `proof/${crypto.randomUUID()}.${ext}`;
     const { error } = await supabase.storage
@@ -118,18 +129,18 @@ function AddVenueInner() {
     try {
       let images;
       try {
-        const uploaded = await uploadImages(f.images.files);
+        const uploaded = await uploadImages(f.images.files, ta.errImages);
         images = uploaded.length > 0 ? uploaded : [PLACEHOLDER_IMAGE];
-      } catch {
-        throw new Error(ta.errImages);
+      } catch (e) {
+        throw new Error(e.message === "__count_images__" ? ta.errTooManyImages : ta.errImages);
       }
 
       // Optional, private verification proof (separate from public Photos).
       let verification_docs = [];
       try {
-        verification_docs = await uploadProofDocs(f.proof.files);
-      } catch {
-        throw new Error(ta.errProof);
+        verification_docs = await uploadProofDocs(f.proof.files, ta.errProof);
+      } catch (e) {
+        throw new Error(e.message === "__count_docs__" ? ta.errTooManyDocs : ta.errProof);
       }
 
       const payload = {

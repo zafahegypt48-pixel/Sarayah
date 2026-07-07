@@ -421,7 +421,7 @@ const en = {
     suitableFor: "Suitable for (select all that apply)",
     description: "Description",
     photos: "Photos",
-    photosHint: "Upload one or more photos. If you skip this, we'll use a placeholder you can replace later.",
+    photosHint: "Upload up to 12 photos (max 10 MB each). Large images are optimised automatically without losing visible quality. If you skip this, we'll use a placeholder you can replace later.",
     amenities: "Amenities",
     ownerDetails: "Your details (helps us verify ownership)",
     ownerHint: "Optional, but listings with verifiable details get approved faster. Never shown publicly.",
@@ -435,7 +435,7 @@ const en = {
     socialLink: "Social media link (Instagram/Facebook)",
     proof: "Verification proof (optional)",
     proofHint:
-      "Optional — only used for verification, never shown publicly. (Business card, authorization letter, or similar — image or PDF, max 5MB each. Separate from the venue Photos above.)",
+      "Optional — only used for verification, never shown publicly. (Business card, authorization letter, or similar — image or PDF, up to 6 files, max 20 MB each. Separate from the venue Photos above.)",
     moderationNote:
       "Submissions are reviewed by our team before appearing publicly. Don't list a venue you don't own or represent — fake or impersonated listings are removed.",
     authConfirm:
@@ -449,8 +449,10 @@ const en = {
     errCapacity: "Max capacity must be greater than or equal to min capacity.",
     errPrice: "Please enter a starting price greater than 0.",
     errAuth: "Please confirm that you are the owner or an authorized representative of this venue.",
-    errImages: "Image upload failed. Please try smaller images or remove them and try again.",
-    errProof: "Verification proof upload failed (max 5MB, image or PDF). Remove it or try again.",
+    errImages: "Image upload failed. Each photo must be 10 MB or less (JPEG, PNG, WebP, or GIF). Remove the large one and try again.",
+    errProof: "Verification proof upload failed. Each file must be 20 MB or less (image or PDF). Remove it or try again.",
+    errTooManyImages: "Too many photos — please upload 12 or fewer.",
+    errTooManyDocs: "Too many verification files — please upload 6 or fewer.",
     errSave: "Could not save the venue. Please try again.",
     errGeneric: "Something went wrong. Please try again.",
     loading: "Loading…",
@@ -1089,7 +1091,7 @@ const ar = {
     suitableFor: "مناسب لـ (اختر كل ما ينطبق)",
     description: "الوصف",
     photos: "الصور",
-    photosHint: "ارفع صورة واحدة أو أكثر. إذا تخطيت هذا، سنستخدم صورة مؤقتة يمكنك استبدالها لاحقًا.",
+    photosHint: "ارفع حتى 12 صورة (بحد أقصى 10 ميجابايت لكل صورة). يتم تحسين الصور الكبيرة تلقائيًا دون فقدان ملحوظ للجودة. إذا تخطيت هذا، سنستخدم صورة مؤقتة يمكنك استبدالها لاحقًا.",
     amenities: "الخدمات",
     ownerDetails: "بياناتك (تساعدنا على توثيق الملكية)",
     ownerHint: "اختياري، لكن القوائم ذات البيانات القابلة للتحقق تُعتمد أسرع. لا تُعرض للعامة أبدًا.",
@@ -1103,7 +1105,7 @@ const ar = {
     socialLink: "رابط التواصل الاجتماعي (إنستغرام/فيسبوك)",
     proof: "إثبات التوثيق (اختياري)",
     proofHint:
-      "اختياري — يُستخدم فقط للتوثيق، ولا يُعرض للعامة. (كارت عمل، خطاب تفويض، أو ما شابه — صورة أو PDF، بحد أقصى 5 ميجابايت لكل ملف. منفصل عن صور المكان أعلاه.)",
+      "اختياري — يُستخدم فقط للتوثيق، ولا يُعرض للعامة. (كارت عمل، خطاب تفويض، أو ما شابه — صورة أو PDF، حتى 6 ملفات، بحد أقصى 20 ميجابايت لكل ملف. منفصل عن صور المكان أعلاه.)",
     moderationNote:
       "تُراجع الإضافات من فريقنا قبل ظهورها للعامة. لا تضف مكانًا لا تملكه أو لا تمثّله — تُزال القوائم المزيّفة أو المنتحَلة.",
     authConfirm:
@@ -1117,8 +1119,10 @@ const ar = {
     errCapacity: "يجب أن تكون أقصى سعة أكبر من أو تساوي أقل سعة.",
     errPrice: "من فضلك أدخل سعر بداية أكبر من 0.",
     errAuth: "من فضلك أكّد أنك المالك أو ممثل مفوّض لهذا المكان.",
-    errImages: "فشل رفع الصور. جرّب صورًا أصغر أو أزلها وحاول مجددًا.",
-    errProof: "فشل رفع إثبات التوثيق (بحد أقصى 5 ميجابايت، صورة أو PDF). أزله أو حاول مجددًا.",
+    errImages: "فشل رفع الصور. يجب ألا تتجاوز كل صورة 10 ميجابايت (JPEG أو PNG أو WebP أو GIF). أزل الصورة الكبيرة وحاول مجددًا.",
+    errProof: "فشل رفع إثبات التوثيق. يجب ألا يتجاوز كل ملف 20 ميجابايت (صورة أو PDF). أزله أو حاول مجددًا.",
+    errTooManyImages: "عدد الصور كبير جدًا — من فضلك ارفع 12 صورة أو أقل.",
+    errTooManyDocs: "عدد ملفات التوثيق كبير جدًا — من فضلك ارفع 6 ملفات أو أقل.",
     errSave: "تعذّر حفظ المكان. من فضلك حاول مرة أخرى.",
     errGeneric: "حدث خطأ ما. من فضلك حاول مرة أخرى.",
     loading: "جارٍ التحميل…",

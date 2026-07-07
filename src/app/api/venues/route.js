@@ -135,11 +135,15 @@ export async function POST(request) {
   // App-generated id so Supabase and any downstream mirror (n8n → Sheet) share the
   // same key (anon can't read the DB-generated id back through RLS).
   venue.id = "v" + randomUUID().replace(/-/g, "");
+  // Server-side count caps (per-file SIZE is enforced by the Supabase Storage
+  // bucket file_size_limit — 10 MB images / 20 MB docs — since files upload
+  // directly to Storage, not through this route).
+  if (Array.isArray(venue.images)) venue.images = venue.images.slice(0, 12);
   // Private proof doc paths (must be paths in the venue-docs bucket, not URLs).
   if (Array.isArray(body.verification_docs)) {
     venue.verification_docs = body.verification_docs
       .filter((p) => typeof p === "string" && p.startsWith("proof/"))
-      .slice(0, 10);
+      .slice(0, 6);
   }
   // Outreach attribution (safe metadata only).
   venue.source = body.source === "whatsapp_outreach" ? "whatsapp_outreach" : "public";

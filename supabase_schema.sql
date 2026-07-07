@@ -291,20 +291,20 @@ grant select (
 -- ---------------------------------------------------------------------------
 -- venue-images: PUBLIC (venue photos shown on the site). Public INSERT is allowed
 -- (free listing flow), so cap size and restrict to safe raster image types (NO svg
--- — it can carry script). 5MB limit.
+-- — it can carry script). 10MB limit per image (modern phone photos).
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('venue-images', 'venue-images', true, 5242880,
+values ('venue-images', 'venue-images', true, 10485760,
         array['image/jpeg','image/png','image/webp','image/gif'])
 on conflict (id) do update
-  set public = true, file_size_limit = 5242880,
+  set public = true, file_size_limit = 10485760,
       allowed_mime_types = array['image/jpeg','image/png','image/webp','image/gif'];
 
--- venue-docs: PRIVATE verification/proof documents. 5MB, images + PDF only.
+-- venue-docs: PRIVATE verification/proof documents. 20MB, images + PDF only.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values ('venue-docs', 'venue-docs', false, 5242880,
+values ('venue-docs', 'venue-docs', false, 20971520,
         array['image/jpeg','image/png','image/webp','application/pdf'])
 on conflict (id) do update
-  set public = false, file_size_limit = 5242880,
+  set public = false, file_size_limit = 20971520,
       allowed_mime_types = array['image/jpeg','image/png','image/webp','application/pdf'];
 
 -- Storage policies.

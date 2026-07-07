@@ -95,8 +95,8 @@ and **cannot** see pending/rejected/suspended venues (only `approved`/`verified`
 
 | Bucket | Public? | Limits | Policies |
 |---|---|---|---|
-| `venue-images` | **public** | — | public read + public upload (venue photos) |
-| `venue-docs` | **private** | 5 MB, image/jpeg·png·webp + pdf | public **insert**; **admin-only** read & delete |
+| `venue-images` | **public** | 10 MB, image/jpeg·png·webp·gif | public read + public upload (venue photos) |
+| `venue-docs` | **private** | 20 MB, image/jpeg·png·webp + pdf | public **insert**; **admin-only** read & delete |
 
 - Public users **cannot list or download** `venue-docs`. Admins view proof
   documents only via **short-lived signed URLs** generated from an admin session.
