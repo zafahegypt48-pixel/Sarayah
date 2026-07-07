@@ -9,8 +9,21 @@ import { createBrowserClient } from "@supabase/ssr";
 // time), @supabase/ssr's createBrowserClient THROWS — which would crash every
 // client component that creates a client during render and 500 the whole page.
 // Instead we return a no-op stub so the UI still renders (logged-out, no data).
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+//
+// Config source (in priority order):
+//   1) NEXT_PUBLIC_* — inlined into the bundle at BUILD time.
+//   2) window.__PUBLIC_ENV — injected at REQUEST time by app/layout.js.
+// The runtime fallback (2) makes auth work even when a build shipped without the
+// env vars (a common Vercel "build cache" pitfall), because the server reads
+// process.env at request time. Both are PUBLIC values (project URL + anon key)
+// that ship to the browser by design — this exposes no secret.
+function publicEnv() {
+  const runtime = (typeof window !== "undefined" && window.__PUBLIC_ENV) || {};
+  return {
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL || runtime.SUPABASE_URL,
+    key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || runtime.SUPABASE_ANON_KEY,
+  };
+}
 
 function makeStub() {
   const authErr = { data: { user: null, session: null }, error: new Error("Supabase not configured") };
@@ -40,11 +53,12 @@ function makeStub() {
 }
 
 export function createSupabaseBrowserClient() {
-  if (!URL || !KEY) {
+  const { url, key } = publicEnv();
+  if (!url || !key) {
     if (typeof console !== "undefined") {
       console.warn("Supabase env vars missing — running with a no-op client (logged-out, no data).");
     }
     return makeStub();
   }
-  return createBrowserClient(URL, KEY);
+  return createBrowserClient(url, key);
 }

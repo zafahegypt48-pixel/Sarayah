@@ -91,6 +91,19 @@ export default async function RootLayout({ children }) {
       className={`${fraunces.variable} ${workSans.variable} ${cairo.variable} ${poppins.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        {/* Runtime-inject PUBLIC Supabase config so the browser auth client works
+            even if the build didn't inline NEXT_PUBLIC_* (e.g. Vercel build cache).
+            This layout renders per-request (it reads cookies), so process.env is
+            read at REQUEST time. Values are public (project URL + anon key) — the
+            same values that normally ship in the client bundle; no secret here. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.__PUBLIC_ENV=${JSON.stringify({
+              SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+              SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+            })};`,
+          }}
+        />
         <LanguageProvider locale={locale} dict={dict}>
           <Navbar />
           <main className="flex-1 pb-20 md:pb-0">{children}</main>
