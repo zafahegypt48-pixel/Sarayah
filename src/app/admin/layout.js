@@ -1,18 +1,21 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser, isAdminEmail } from "@/lib/auth";
+import { getCurrentUser, getAdminContext } from "@/lib/auth";
 import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
-// Server-side guard: only logged-in admins (emails in ADMIN_EMAILS) can see
-// anything under /admin. Everyone else is bounced to /login.
+// Server-side guard: only logged-in users whose email is in the public.admins
+// table (verified in the DB via is_admin()) can see anything under /admin.
+// Everyone else is bounced to /login. This does NOT trust the ADMIN_EMAILS env.
 export default async function AdminLayout({ children }) {
   const user = await getCurrentUser();
-
   if (!user) {
     redirect("/login?next=/admin");
   }
-  if (!isAdminEmail(user.email)) {
+
+  // Authoritative admin check against public.admins (null unless in the table).
+  const admin = await getAdminContext();
+  if (!admin) {
     redirect("/login?error=not-admin");
   }
 
