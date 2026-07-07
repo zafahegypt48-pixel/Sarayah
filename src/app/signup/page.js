@@ -4,6 +4,32 @@ import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useI18n } from "@/lib/i18n/client";
 
+// Build a safe, human-readable message from ANY error shape.
+// A Supabase AuthError extends Error, whose `message`/`stack` are NON-ENUMERABLE
+// — so `JSON.stringify(err)` is "{}" and rendering the object directly yields the
+// dreaded red "{}". We read the known fields explicitly and never render the raw
+// object. Full details are logged to the console for debugging (an auth error
+// carries no secrets).
+function describeAuthError(err, fallback) {
+  if (!err) return fallback;
+  if (typeof err === "string") return err || fallback;
+  const message = err.message;
+  const code = err.code;
+  const status = err.status;
+  const name = err.name;
+  if (typeof console !== "undefined") {
+    console.error("Signup error:", { message, code, status, name });
+  }
+  return (
+    message ||
+    err.error_description ||
+    err.error ||
+    (code ? `Error: ${code}` : "") ||
+    (status ? `Request failed (HTTP ${status})` : "") ||
+    fallback
+  );
+}
+
 export default function SignupPage() {
   const { t } = useI18n();
   const ts = t.signup;
@@ -17,43 +43,51 @@ export default function SignupPage() {
     setError("");
     setMessage("");
     setLoading(true);
-    const supabase = createSupabaseBrowserClient();
     // Send the confirmation email back to THIS environment's callback route.
-    // Using window.location.origin means dev → http://localhost:3000/auth/callback
-    // and prod → https://sarayah.vercel.app/auth/callback automatically — no
-    // hardcoded/localhost URL, and it can never be null in production.
+    // window.location.origin → dev = localhost, prod = sarayah.vercel.app,
+    // automatically — no hardcoded/localhost URL, never null in production.
     const emailRedirectTo =
       typeof window !== "undefined"
         ? `${window.location.origin}/auth/callback`
         : (process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` : undefined);
-    const { data, error } = await supabase.auth.signUp({
-      email: e.target.email.value,
-      password: e.target.password.value,
-      options: {
-        emailRedirectTo,
-        data: {
-          full_name: e.target.fullName.value,
-          role: e.target.role.value,
+
+    let data, error;
+    try {
+      const supabase = createSupabaseBrowserClient();
+      ({ data, error } = await supabase.auth.signUp({
+        email: e.target.email.value,
+        password: e.target.password.value,
+        options: {
+          emailRedirectTo,
+          data: {
+            full_name: e.target.fullName.value,
+            role: e.target.role.value,
+          },
         },
-      },
-    });
+      }));
+    } catch (thrown) {
+      // Network/thrown errors also come here — surface them, never as "{}".
+      setLoading(false);
+      setError(describeAuthError(thrown, ts.genericError));
+      return;
+    }
     setLoading(false);
-    // Surface ANY Supabase error verbatim (rate limits, invalid email, SMTP
-    // failures, "Supabase not configured", etc.) — never fail silently.
+
+    // Surface ANY Supabase error with its real fields (rate limits, invalid
+    // email, "Error sending confirmation email" (SMTP), etc.) — never as "{}".
     if (error) {
-      setError(error.message);
+      setError(describeAuthError(error, ts.genericError));
       return;
     }
     // Anti-enumeration: Supabase returns a user with an EMPTY identities array
-    // when the email is ALREADY registered. Detect it and say so, instead of the
-    // misleading "check your email" (which would never arrive).
+    // when the email is ALREADY registered. Say so instead of "check your email".
     const identities = data?.user?.identities;
     if (Array.isArray(identities) && identities.length === 0) {
       setError(ts.alreadyRegistered);
       return;
     }
     // Confirmation on → no session yet → tell them to check email (incl. spam).
-    if (!data.session) {
+    if (!data?.session) {
       setMessage(ts.confirmEmail);
       return;
     }
