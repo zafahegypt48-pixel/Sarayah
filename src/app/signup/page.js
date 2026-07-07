@@ -18,10 +18,19 @@ export default function SignupPage() {
     setMessage("");
     setLoading(true);
     const supabase = createSupabaseBrowserClient();
+    // Send the confirmation email back to THIS environment's callback route.
+    // Using window.location.origin means dev → http://localhost:3000/auth/callback
+    // and prod → https://sarayah.vercel.app/auth/callback automatically — no
+    // hardcoded/localhost URL, and it can never be null in production.
+    const emailRedirectTo =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/auth/callback`
+        : (process.env.NEXT_PUBLIC_SITE_URL ? `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback` : undefined);
     const { data, error } = await supabase.auth.signUp({
       email: e.target.email.value,
       password: e.target.password.value,
       options: {
+        emailRedirectTo,
         data: {
           full_name: e.target.fullName.value,
           role: e.target.role.value,

@@ -378,6 +378,8 @@ const en = {
     signupLink: "Sign up",
     notAdmin:
       "That account isn't an admin. Admin tools are for the Sarayah team — you're signed in and can browse venues and send inquiries normally.",
+    confirmError:
+      "We couldn't confirm your email — the link may have expired or already been used. Try logging in below, or sign up again.",
   },
 
   signup: {
@@ -1028,6 +1030,8 @@ const ar = {
     signupLink: "إنشاء حساب",
     notAdmin:
       "هذا الحساب ليس مسؤولًا. أدوات الإدارة مخصصة لفريق Sarayah — أنت مسجّل الدخول ويمكنك تصفّح الأماكن وإرسال الطلبات بشكل طبيعي.",
+    confirmError:
+      "تعذّر تأكيد بريدك — قد يكون الرابط منتهيًا أو مُستخدَمًا من قبل. حاول تسجيل الدخول بالأسفل، أو أنشئ حسابًا من جديد.",
   },
 
   signup: {

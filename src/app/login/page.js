@@ -12,7 +12,8 @@ function LoginInner() {
   // Default to home so customers land somewhere useful. Only go to /admin when a
   // protected page explicitly asked for it (e.g. /login?next=/admin).
   const next = params.get("next") || "/";
-  const initialError = params.get("error") === "not-admin" ? tl.notAdmin : "";
+  const errParam = params.get("error");
+  const initialError = errParam === "not-admin" ? tl.notAdmin : errParam === "confirm" ? tl.confirmError : "";
   const [error, setError] = useState(initialError);
   const [loading, setLoading] = useState(false);
 
