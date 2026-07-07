@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "./supabase/server";
+import { resolveSupabasePublic } from "./supabase/config";
 
 // Comma-separated list of admin emails, set in .env.local as ADMIN_EMAILS.
 // Anyone signing in with one of these emails can reach /admin and the
@@ -21,7 +22,8 @@ export function isAdminEmail(email) {
 // this returns null instead of throwing — so the navbar (which runs on EVERY
 // page) can never 500 the whole site over an auth hiccup.
 export async function getCurrentUser() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
+  const { url, key } = resolveSupabasePublic();
+  if (!url || !key) return null;
   try {
     const supabase = await createSupabaseServerClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -60,11 +62,8 @@ export async function getAdminContext() {
   // (Passing the token via global.headers.Authorization does NOT work — the
   // client overwrites that header with the anon key when it has no session,
   // so RLS would see the request as anonymous.)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    { accessToken: async () => token }
-  );
+  const { url, key } = resolveSupabasePublic();
+  const supabase = createClient(url, key, { accessToken: async () => token });
   return { user, supabase };
 }
 
@@ -78,10 +77,7 @@ export async function getUserContext() {
   const { data: { session } } = await ssr.auth.getSession();
   const token = session?.access_token;
   if (!token) return null;
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    { accessToken: async () => token }
-  );
+  const { url, key } = resolveSupabasePublic();
+  const supabase = createClient(url, key, { accessToken: async () => token });
   return { user, supabase };
 }

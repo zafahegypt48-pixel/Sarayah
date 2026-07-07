@@ -1,5 +1,6 @@
 "use client";
 import { createBrowserClient } from "@supabase/ssr";
+import { resolveSupabasePublic } from "./config";
 
 // Cookie-based Supabase client for use in client components (login, signup,
 // logout, favorites, settings). Uses the public anon key only — never the
@@ -18,11 +19,8 @@ import { createBrowserClient } from "@supabase/ssr";
 // process.env at request time. Both are PUBLIC values (project URL + anon key)
 // that ship to the browser by design — this exposes no secret.
 function publicEnv() {
-  const runtime = (typeof window !== "undefined" && window.__PUBLIC_ENV) || {};
-  return {
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL || runtime.SUPABASE_URL,
-    key: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || runtime.SUPABASE_ANON_KEY,
-  };
+  const runtime = (typeof window !== "undefined" && window.__PUBLIC_ENV) || undefined;
+  return resolveSupabasePublic(runtime);
 }
 
 function makeStub() {

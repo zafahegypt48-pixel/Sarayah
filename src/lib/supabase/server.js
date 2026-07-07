@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { resolveSupabasePublic } from "./config";
 
 // No-op stub returned when Supabase env vars are missing, so we never throw at
 // the @supabase/ssr layer (which would 500 any server component that builds a
@@ -17,14 +18,15 @@ function makeServerStub() {
 // Reads the user's session from cookies so we know who is logged in.
 // In Next.js 16 `cookies()` is async, so this helper is async too.
 export async function createSupabaseServerClient() {
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+  const { url, key } = resolveSupabasePublic();
+  if (!url || !key) {
     return makeServerStub();
   }
   const cookieStore = await cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    url,
+    key,
     {
       cookies: {
         getAll() {
