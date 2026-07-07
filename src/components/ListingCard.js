@@ -20,25 +20,25 @@ export default function ListingCard({ listing, category }) {
   const catName = category ? (locale === "ar" ? category.name_ar : category.name_en) : tv("type", listing.type);
 
   return (
-    <div className="relative">
+    <div className="relative h-full">
       {/* Favorite heart sits OUTSIDE the link (valid HTML) and over the image. */}
       <div className="absolute top-3 end-3 z-10">
         <FavoriteButton listingId={listing.id} />
       </div>
       <Link
         href={`/listing/${slugOrId}`}
-        className="group block bg-surface rounded-2xl border border-hair overflow-hidden hover:shadow-lg hover:shadow-ink/5 transition-shadow"
+        className="group flex flex-col h-full bg-surface rounded-2xl border border-hair overflow-hidden hover:shadow-lg hover:shadow-ink/5 transition-shadow"
       >
-        <div className="relative h-52 overflow-hidden">
+        <div className="relative h-52 shrink-0 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={cover} alt={listing.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
           {catName && (
             <span className="absolute top-3 start-3 bg-canvas/95 text-cream text-xs font-semibold px-3 py-1 rounded-full">{catName}</span>
           )}
         </div>
-        <div className="p-4">
+        <div className="p-4 flex flex-col flex-1">
           <div className="flex items-start justify-between gap-2">
-            <h3 className="font-display text-lg leading-tight text-cream">
+            <h3 className="font-display text-lg leading-tight text-cream line-clamp-2 break-words">
               {listing.name}
               {listing.verification_status === "verified" && (
                 <span className="ms-1.5 align-middle text-xs font-semibold text-blue-700" title={t.card.verifiedTitle}>✓</span>
@@ -50,13 +50,14 @@ export default function ListingCard({ listing, category }) {
               </div>
             )}
           </div>
-          {location && <p className="text-sm text-cream/60 mt-1">{location}</p>}
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-hair">
+          {location && <p className="text-sm text-cream/60 mt-1 truncate">{location}</p>}
+          {/* Price / reviews pinned to the bottom so the divider aligns across cards. */}
+          <div className="flex items-center justify-between gap-2 mt-auto pt-4 border-t border-hair">
             {price > 0 ? (
-              <div className="text-sm font-semibold text-emerald">{t.marketplace.from} {formatEGP(price)} {t.concierge.currency}</div>
+              <div className="text-sm font-semibold text-emerald whitespace-nowrap">{t.marketplace.from} {formatEGP(price)} {t.concierge.currency}</div>
             ) : <span />}
             {listing.reviews > 0 && (
-              <div className="text-xs text-cream/50">{t.marketplace.reviews.replace("{n}", listing.reviews)}</div>
+              <div className="text-xs text-cream/50 shrink-0">{t.marketplace.reviews.replace("{n}", listing.reviews)}</div>
             )}
           </div>
         </div>

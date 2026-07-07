@@ -30,8 +30,8 @@ export default function VenueCard({ venue }) {
       : null;
 
   return (
-    <article className="group relative flex flex-col bg-surface rounded-2xl border border-hair overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:shadow-ink/10 hover:border-emerald/30">
-      <Link href={href} className="block relative h-52 overflow-hidden" aria-label={venue.name}>
+    <article className="group relative flex flex-col h-full bg-surface rounded-2xl border border-hair overflow-hidden transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-xl hover:shadow-ink/10 hover:border-emerald/30">
+      <Link href={href} className="block relative h-52 shrink-0 overflow-hidden" aria-label={venue.name}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={cover}
@@ -54,7 +54,7 @@ export default function VenueCard({ venue }) {
       <div className="p-4 flex flex-col flex-1">
         <div className="flex items-start justify-between gap-2">
           <Link href={href} className="min-w-0">
-            <h3 className="font-display text-lg leading-tight text-cream group-hover:text-emerald transition-colors">
+            <h3 className="font-display text-lg leading-tight text-cream group-hover:text-emerald transition-colors line-clamp-2 break-words">
               {venue.name}
               {venue.verification_status === "verified" && (
                 <span className="ms-1.5 align-middle text-xs font-semibold text-blue-700" title={t.card.verifiedTitle}>✓</span>
@@ -69,20 +69,21 @@ export default function VenueCard({ venue }) {
           )}
         </div>
 
-        {location && <p className="text-sm text-cream/60 mt-1">{location}</p>}
+        {location && <p className="text-sm text-cream/60 mt-1 truncate">{location}</p>}
 
         {venue.description && (
           <p className="text-sm text-cream/55 mt-2 line-clamp-2 leading-relaxed">{venue.description}</p>
         )}
 
-        {/* Facts: capacity + price */}
-        <div className="flex items-center justify-between gap-2 mt-4 pt-4 border-t border-hair">
+        {/* Facts: capacity + price — pinned to the bottom (mt-auto) so the divider,
+            facts, and action buttons share the same baseline across every card. */}
+        <div className="flex items-center justify-between gap-2 mt-auto pt-4 border-t border-hair">
           {capLabel ? (
-            <div className="text-sm text-cream/60">
+            <div className="text-sm text-cream/60 min-w-0 truncate">
               <span className="font-semibold text-cream">{capLabel}</span> {t.card.guests}
             </div>
           ) : <span />}
-          <div className="text-sm font-semibold text-emerald whitespace-nowrap">{priceLabel}</div>
+          <div className="text-sm font-semibold text-emerald whitespace-nowrap shrink-0">{priceLabel}</div>
         </div>
 
         {/* Actions */}
