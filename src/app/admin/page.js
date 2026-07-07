@@ -121,6 +121,17 @@ export default function AdminPage() {
 
   const filteredVenues = venueFilter === "all" ? venues : venues.filter((v) => (v.status || "pending_review") === venueFilter);
   const pendingCount = venues.filter((v) => (v.status || "pending_review") === "pending_review").length;
+  // Names that appear on more than one venue row (case-insensitive) — used to warn
+  // admins so they approve the CORRECT row (duplicates differ by id/owner/status).
+  const dupNames = (() => {
+    const counts = {};
+    for (const v of venues) {
+      const k = (v.name || "").trim().toLowerCase();
+      if (k) counts[k] = (counts[k] || 0) + 1;
+    }
+    return new Set(Object.keys(counts).filter((k) => counts[k] > 1));
+  })();
+  const isDup = (v) => dupNames.has((v.name || "").trim().toLowerCase());
   const pendingReviews = reviews.filter((r) => (r.status || "pending") === "pending").length;
   const pendingClaims = claims.filter((c) => (c.status || "pending") === "pending").length;
 
@@ -198,23 +209,47 @@ export default function AdminPage() {
               </button>
             ))}
           </div>
+          {dupNames.size > 0 && (
+            <div className="bg-brass/10 border border-brass/40 text-brass-deep rounded-xl p-3 mb-3 text-xs">
+              ⚠ <b>{dupNames.size}</b> venue name{dupNames.size > 1 ? "s appear" : " appears"} on more than one row
+              ({[...dupNames].map((n) => `"${n}"`).join(", ")}). Duplicates differ by <b>Venue ID</b>, <b>Owner</b>,
+              and <b>Status</b> — check those columns and approve the row that is actually owned by the vendor.
+            </div>
+          )}
           <p className="text-xs text-cream/40 mb-3">Sorted newest first.</p>
           <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
-            <table className="w-full text-sm min-w-[980px]">
+            <table className="w-full text-sm min-w-[1120px]">
               <thead className="bg-night text-onnight text-xs uppercase">
-                <tr>{["Name", "Type", "City", "Source", "Status", "Verified", "Dates", "Actions"].map((h) => (
+                <tr>{["Name", "Venue ID", "Owner", "Type", "City", "Source", "Status", "Verified", "Dates", "Actions"].map((h) => (
                   <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
               </thead>
               <tbody>
                 {filteredVenues.length === 0 && (
-                  <tr><td colSpan={8} className="text-center py-10 text-cream/40">No venues in this view.</td></tr>
+                  <tr><td colSpan={10} className="text-center py-10 text-cream/40">No venues in this view.</td></tr>
                 )}
                 {filteredVenues.map((v) => {
                   const status = v.status || "pending_review";
                   const verified = v.verification_status === "verified";
                   return (
                     <tr key={v.id} className="border-t border-hair align-middle">
-                      <td className="px-4 py-3 font-medium">{v.name}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {isDup(v) && <span title="Duplicate name — verify Venue ID / Owner before approving" className="text-brass-deep mr-1">⚠</span>}
+                        {v.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          title={`${v.id} — click to copy`}
+                          onClick={() => navigator.clipboard?.writeText(v.id)}
+                          className="font-mono text-[11px] text-cream/60 hover:text-cream">
+                          {v.id ? `${v.id.slice(0, 10)}…` : "—"}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        {v.claimed_by_user_id
+                          ? <span title={v.claimed_by_user_id} className="text-xs font-semibold text-emerald">Claimed<span className="block font-mono text-[10px] text-cream/40 font-normal">{v.claimed_by_user_id.slice(0, 8)}…</span></span>
+                          : <span className="text-xs text-cream/40">Unclaimed</span>}
+                      </td>
                       <td className="px-4 py-3">{v.type}</td>
                       <td className="px-4 py-3">{v.city}</td>
                       <td className="px-4 py-3 text-cream/50">{v.source === "whatsapp_outreach" ? "WhatsApp" : "Public"}</td>
