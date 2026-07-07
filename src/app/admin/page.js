@@ -35,6 +35,7 @@ export default function AdminPage() {
   const [leads, setLeads] = useState([]);
   const [reports, setReports] = useState([]);
   const [reviews, setReviews] = useState([]);
+  const [claims, setClaims] = useState([]);
   const [tab, setTab] = useState("venues");
   const [venueFilter, setVenueFilter] = useState("pending_review");
   const [leadSearch, setLeadSearch] = useState("");
@@ -47,11 +48,12 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const [vRes, lRes, rRes, revRes] = await Promise.all([
+      const [vRes, lRes, rRes, revRes, cRes] = await Promise.all([
         fetch("/api/venues?scope=admin"),
         fetch("/api/leads"),
         fetch("/api/reports"),
         fetch("/api/reviews"),
+        fetch("/api/admin/claims"),
       ]);
       if (!vRes.ok) throw new Error("Failed to load venues (are you signed in as admin?)");
       if (!lRes.ok) throw new Error("Failed to load leads");
@@ -59,6 +61,7 @@ export default function AdminPage() {
       setLeads(await lRes.json());
       setReports(rRes.ok ? await rRes.json() : []);
       setReviews(revRes.ok ? await revRes.json() : []);
+      setClaims(cRes.ok ? await cRes.json() : []);
     } catch (e) {
       setError(e.message);
     } finally {
@@ -95,6 +98,16 @@ export default function AdminPage() {
     setReviews((rs) => rs.map((r) => (r.id === id ? updated : r)));
   }
 
+  async function decideClaim(id, approve) {
+    const res = await fetch("/api/admin/claims", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, approve }),
+    });
+    if (!res.ok) { alert("Action failed."); return; }
+    setClaims((cs) => cs.map((c) => (c.id === id ? { ...c, status: approve ? "approved" : "rejected" } : c)));
+    // A newly-approved claim assigns ownership — refresh venues so the change is reflected.
+    if (approve) loadAll();
+  }
+
   async function updateLeadStatus(id, status) {
     const prev = leads;
     setLeads((ls) => ls.map((l) => (l.id === id ? { ...l, status } : l)));
@@ -107,6 +120,7 @@ export default function AdminPage() {
   const filteredVenues = venueFilter === "all" ? venues : venues.filter((v) => (v.status || "pending_review") === venueFilter);
   const pendingCount = venues.filter((v) => (v.status || "pending_review") === "pending_review").length;
   const pendingReviews = reviews.filter((r) => (r.status || "pending") === "pending").length;
+  const pendingClaims = claims.filter((c) => (c.status || "pending") === "pending").length;
 
   const filteredLeads = leads.filter((l) => {
     if (leadStatusFilter !== "all" && (l.status || "new") !== leadStatusFilter) return false;
@@ -140,12 +154,13 @@ export default function AdminPage() {
       <p className="text-cream/60 mb-6">Review submissions, manage venues, and track inquiries.</p>
 
       {!loading && !error && (
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 mb-8">
           <Stat label="Pending venues" value={pendingCount} highlight={pendingCount > 0} onClick={() => { setTab("venues"); setVenueFilter("pending_review"); }} />
           <Stat label="Live venues" value={venues.filter((v) => ["approved", "verified"].includes(v.status)).length} />
           <Stat label="New leads" value={leads.filter((l) => (l.status || "new") === "new").length} highlight={leads.some((l) => (l.status || "new") === "new")} onClick={() => setTab("leads")} />
           <Stat label="Open reports" value={reports.length} highlight={reports.length > 0} onClick={() => setTab("reports")} />
           <Stat label="Pending reviews" value={pendingReviews} highlight={pendingReviews > 0} onClick={() => setTab("reviews")} />
+          <Stat label="Claim requests" value={pendingClaims} highlight={pendingClaims > 0} onClick={() => setTab("claims")} />
         </div>
       )}
 
@@ -153,7 +168,8 @@ export default function AdminPage() {
         {[["venues", `Venues (${venues.length})${pendingCount ? ` · ${pendingCount} pending` : ""}`],
           ["leads", `Leads (${leads.length})`],
           ["reports", `Reports (${reports.length})`],
-          ["reviews", `Reviews (${reviews.length})${pendingReviews ? ` · ${pendingReviews} pending` : ""}`]].map(([t, label]) => (
+          ["reviews", `Reviews (${reviews.length})${pendingReviews ? ` · ${pendingReviews} pending` : ""}`],
+          ["claims", `Claims (${claims.length})${pendingClaims ? ` · ${pendingClaims} pending` : ""}`]].map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)}
             className={`pb-3 text-sm font-semibold border-b-2 transition ${tab === t ? "border-emerald text-emerald" : "border-transparent text-cream/40 hover:text-cream"}`}>
             {label}
@@ -364,6 +380,41 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {/* ---------------- CLAIMS ---------------- */}
+      {!loading && !error && tab === "claims" && (
+        <>
+          <p className="text-xs text-cream/40 mb-3">
+            Ownership requests where the vendor&apos;s login email did not match the listing&apos;s owner email.
+            Verify the requester genuinely owns the venue (callback to the official public number / business email)
+            before approving — approval assigns the listing to their account.
+          </p>
+          <div className="bg-surface border border-hair rounded-2xl overflow-x-auto">
+            <table className="w-full text-sm min-w-[720px]">
+              <thead className="bg-night text-onnight text-xs uppercase">
+                <tr>{["Listing", "Requested by", "Requested", "Actions"].map((h) => (
+                  <th key={h} className="text-left px-4 py-3 font-semibold">{h}</th>))}</tr>
+              </thead>
+              <tbody>
+                {claims.length === 0 && (
+                  <tr><td colSpan={4} className="text-center py-10 text-cream/40">No pending claim requests.</td></tr>
+                )}
+                {claims.map((c) => (
+                  <tr key={c.id} className="border-t border-hair align-middle">
+                    <td className="px-4 py-3 font-medium">{c.venue_name || c.venue_id}</td>
+                    <td className="px-4 py-3">{c.claimant_email || "—"}</td>
+                    <td className="px-4 py-3 text-cream/50 whitespace-nowrap text-xs">{fmtDateTime(c.created_at)}</td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <button onClick={() => decideClaim(c.id, true)} className="text-xs font-semibold text-emerald hover:underline mr-3">Approve</button>
+                      <button onClick={() => decideClaim(c.id, false)} className="text-xs font-semibold text-red-600 hover:underline">Reject</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {editing && (

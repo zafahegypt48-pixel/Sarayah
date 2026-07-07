@@ -323,6 +323,29 @@ export async function vendorLeads(client) {
   return data;
 }
 
+// --- Secure venue claiming (Phase 5) ---------------------------------------
+// Auto-claims on verified-email match, else files an admin-reviewed request.
+export async function vendorClaimVenue(ident, client) {
+  const { data, error } = await client.rpc("vendor_claim_venue", { p_ident: ident });
+  if (error) throw error;
+  return data;
+}
+export async function vendorMyClaims(client) {
+  const { data, error } = await client.rpc("vendor_my_claims");
+  if (error) throw error;
+  return data || [];
+}
+export async function adminListClaims(client) {
+  const { data, error } = await client.rpc("admin_list_claims");
+  if (error) throw error;
+  return data || [];
+}
+export async function adminApproveClaim(id, approve, client) {
+  const { data, error } = await client.rpc("admin_approve_claim", { p_claim_id: id, p_approve: approve });
+  if (error) throw error;
+  return data;
+}
+
 export async function getVenueById(id, client = supabase, { all = false } = {}) {
   if (usingSupabase) {
     if (all) {
