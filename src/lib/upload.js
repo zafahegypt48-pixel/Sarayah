@@ -13,11 +13,19 @@ export const MAX_DOCS = 6;
 
 export const formatMB = (bytes) => `${(bytes / MB).toFixed(0)} MB`;
 
+// The image types the venue-images / venue-docs buckets accept. A file whose
+// type is NOT here must be converted to WebP client-side (or rejected) — the
+// bucket would otherwise reject it server-side.
+export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+export const isAllowedImageType = (type) => ALLOWED_IMAGE_TYPES.includes(type);
+
 // Downscale + re-encode a large photo to fit under `maxBytes` WITHOUT visible
 // quality loss. Photos already within the dimension cap AND the byte budget are
 // returned untouched, so normal-sized uploads keep their exact original bytes.
-// Animated GIFs and non-images are never re-encoded (would drop animation).
-export async function compressImageToFit(file, { maxBytes = MAX_IMAGE_BYTES, maxDimension = 2560 } = {}) {
+// Animated GIFs are never re-encoded (would drop animation). Pass
+// `reencodeAlways` to force a WebP conversion even when the file is small — used
+// for decodable-but-unsupported formats (HEIC/BMP/…) so the bucket accepts them.
+export async function compressImageToFit(file, { maxBytes = MAX_IMAGE_BYTES, maxDimension = 2560, reencodeAlways = false } = {}) {
   if (!file.type.startsWith("image/") || file.type === "image/gif") return file;
   if (typeof document === "undefined" || typeof createImageBitmap !== "function") return file;
 
@@ -25,13 +33,13 @@ export async function compressImageToFit(file, { maxBytes = MAX_IMAGE_BYTES, max
   try {
     bitmap = await createImageBitmap(file);
   } catch {
-    return file; // can't decode → leave original; server/bucket still validates
+    return file; // can't decode → leave original; caller validates type/size
   }
 
   const biggest = Math.max(bitmap.width, bitmap.height);
   const withinDimension = biggest <= maxDimension;
   const withinBytes = file.size <= maxBytes;
-  if (withinDimension && withinBytes) {
+  if (withinDimension && withinBytes && !reencodeAlways) {
     bitmap.close?.();
     return file; // already fine — preserve original quality exactly
   }

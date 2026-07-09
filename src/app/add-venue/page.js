@@ -1,39 +1,70 @@
 "use client";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useI18n } from "@/lib/i18n/client";
 import {
-  compressImageToFit, MAX_IMAGE_BYTES, MAX_DOC_BYTES, MAX_IMAGES, MAX_DOCS, formatMB,
+  compressImageToFit, isAllowedImageType, MAX_IMAGE_BYTES, MAX_DOC_BYTES, MAX_IMAGES, MAX_DOCS,
 } from "@/lib/upload";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1200&q=80";
 
-// Upload selected files to Supabase Storage and return their public URLs.
-// Falls back to [] if Supabase isn't configured. Large photos are optimised
-// (downscaled + re-encoded) client-side to fit MAX_IMAGE_BYTES without visible
-// quality loss; anything that still exceeds the limit throws `oversizeError`.
-async function uploadImages(files, oversizeError) {
-  if (!files || files.length === 0) return [];
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
-  if (files.length > MAX_IMAGES) throw new Error("__count_images__");
-  const supabase = createSupabaseBrowserClient();
-  const urls = [];
-  for (const original of files) {
-    const file = await compressImageToFit(original, { maxBytes: MAX_IMAGE_BYTES });
-    if (file.size > MAX_IMAGE_BYTES) throw new Error(oversizeError);
-    const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-    const path = `${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("venue-images")
-      .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
-    if (error) throw error;
-    const { data } = supabase.storage.from("venue-images").getPublicUrl(path);
-    urls.push(data.publicUrl);
+// Versioned draft key — bump the suffix if the field shape changes so old drafts
+// are ignored rather than mis-restored.
+const DRAFT_KEY = "sarayah_add_venue_draft_v1";
+
+function readDraft() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const obj = JSON.parse(raw);
+    return obj && typeof obj === "object" ? obj : null;
+  } catch {
+    return null;
   }
-  return urls;
+}
+function writeDraft(data) {
+  if (typeof window === "undefined") return;
+  try {
+    // Only persist once the user has typed something meaningful, so an untouched
+    // visit (which still has default select values) doesn't leave a stale draft.
+    const meaningful = ["name", "description", "city", "area", "price_min", "owner_name", "owner_phone", "owner_email"];
+    const hasContent = meaningful.some((k) => data[k] && String(data[k]).trim());
+    if (hasContent) window.localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
+  } catch { /* quota / private mode — ignore, autosave is best-effort */ }
+}
+function clearDraft() {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
+// Snapshot the form's text/select/checkbox values (NEVER files, never the legal
+// authorization checkbox). Used for localStorage autosave.
+function serializeForm(formEl) {
+  const out = {};
+  for (const el of formEl.elements) {
+    if (!el.name || el.name === "authorization") continue;
+    if (el.type === "file" || el.type === "submit" || el.type === "button") continue;
+    if (el.type === "checkbox") out[el.name] = el.checked;
+    else if (el.multiple && el.tagName === "SELECT") out[el.name] = Array.from(el.selectedOptions).map((o) => o.value);
+    else out[el.name] = el.value;
+  }
+  return out;
+}
+
+// Upload ONE already-processed image file to the public venue-images bucket and
+// return its public URL. Per-file so one failure never aborts the others.
+async function putImage(supabase, file) {
+  const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+  const path = `${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("venue-images")
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) throw error;
+  return supabase.storage.from("venue-images").getPublicUrl(path).data.publicUrl;
 }
 
 // Upload OPTIONAL verification proof to the PRIVATE `venue-docs` bucket. These are
@@ -73,12 +104,62 @@ function AddVenueInner() {
   const [governorate, setGovernorate] = useState("");
   const params = useSearchParams();
 
+  // Draft restore gating: render the form only once we've read localStorage, so
+  // defaultValue on every field can seed from the saved draft on mount.
+  const [ready, setReady] = useState(false);
+  const [draft, setDraft] = useState({});
+  const [draftRestored, setDraftRestored] = useState(false);
+
+  // Managed image state — [{ id, key, name, file, previewUrl, status, error, uploadedUrl }]
+  const [images, setImages] = useState([]);
+  const [imgBusy, setImgBusy] = useState(0); // # of files still being processed
+  const [imgNote, setImgNote] = useState("");
+  const imagesRef = useRef([]);
+  const formRef = useRef(null);
+  const saveTimer = useRef(null);
+  useEffect(() => { imagesRef.current = images; }, [images]);
+
   // Load categories + locations for the selectors.
   useEffect(() => {
     fetch("/api/categories").then((r) => (r.ok ? r.json() : [])).then(setCats).catch(() => {});
     fetch("/api/locations").then((r) => (r.ok ? r.json() : { governorates: [], cities: [] }))
       .then((d) => { setGovs(d.governorates || []); setCities(d.cities || []); }).catch(() => {});
   }, []);
+
+  // Restore an in-progress draft (client only). category/governorate are
+  // controlled selects, so they restore into state; every other field restores
+  // via defaultValue once `ready` flips true.
+  useEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from localStorage on mount */
+    const d = readDraft();
+    if (d) {
+      if (d.category_id) setCategory(d.category_id);
+      if (d.governorate_id) setGovernorate(d.governorate_id);
+      setDraft(d);
+      setDraftRestored(true);
+    }
+    setReady(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  // Revoke all preview object URLs on unmount (avoid memory leaks). Reads the ref
+  // so it always sees the latest list.
+  useEffect(() => () => {
+    imagesRef.current.forEach((x) => x.previewUrl && URL.revokeObjectURL(x.previewUrl));
+  }, []);
+
+  // Persist the draft when the tab is hidden/closed (covers the mobile case where
+  // opening the camera backgrounds and reloads the tab).
+  useEffect(() => {
+    const save = () => { if (formRef.current) writeDraft(serializeForm(formRef.current)); };
+    window.addEventListener("pagehide", save);
+    document.addEventListener("visibilitychange", save);
+    return () => {
+      window.removeEventListener("pagehide", save);
+      document.removeEventListener("visibilitychange", save);
+    };
+  }, []);
+
   const cityOptions = cities.filter((c) => !governorate || c.governorate_id === governorate);
   const isVenue = category === "venues";
   // Outreach attribution (from WhatsApp registration links).
@@ -96,51 +177,170 @@ function AddVenueInner() {
     }
   }, [prospectId]);
 
+  // Debounced autosave on any field edit.
+  function scheduleSave() {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      if (formRef.current) writeDraft(serializeForm(formRef.current));
+    }, 500);
+  }
+
+  // Process one accepted image: optimise/convert as needed, then flip its status.
+  // Fully isolated — a failure here never touches the other images.
+  async function processImage(item) {
+    try {
+      const allowed = isAllowedImageType(item.file.type);
+      const optimized = await compressImageToFit(item.file, {
+        maxBytes: MAX_IMAGE_BYTES,
+        // Convert decodable-but-unsupported types (HEIC/BMP/…) to WebP; never
+        // re-encode GIFs (would drop animation).
+        reencodeAlways: !allowed && item.file.type !== "image/gif",
+      });
+      let error = "";
+      if (optimized.size > MAX_IMAGE_BYTES) {
+        error = ta.photosTooLarge.replace("{name}", item.name);
+      } else if (!isAllowedImageType(optimized.type)) {
+        error = ta.photosUnsupported.replace("{name}", item.name);
+      }
+      setImages((prev) => prev.map((x) =>
+        x.id === item.id ? { ...x, file: optimized, status: error ? "error" : "ready", error } : x));
+    } catch {
+      setImages((prev) => prev.map((x) =>
+        x.id === item.id ? { ...x, status: "error", error: ta.photosProcessFail.replace("{name}", item.name) } : x));
+    } finally {
+      setImgBusy((b) => Math.max(0, b - 1));
+    }
+  }
+
+  // Handle a batch (or single) file selection. Appends to existing photos, dedupes
+  // identical files, enforces the 12-image cap, and starts async processing.
+  function onSelectImages(e) {
+    const picked = Array.from(e.target.files || []);
+    e.target.value = ""; // reset so re-picking the same file fires change again
+    if (picked.length === 0) return;
+
+    const current = imagesRef.current;
+    const remaining = MAX_IMAGES - current.length;
+    if (remaining <= 0) { setImgNote(ta.photosLimitReached); return; }
+
+    const seen = new Set(current.map((it) => it.key));
+    const notes = [];
+    const accepted = [];
+    for (const file of picked) {
+      if (accepted.length >= remaining) break;
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (seen.has(key)) continue; // ignore duplicate / double-tap of same file
+      if (!file.type.startsWith("image/")) {
+        notes.push(ta.photosUnsupported.replace("{name}", file.name));
+        continue;
+      }
+      seen.add(key);
+      accepted.push({
+        id: crypto.randomUUID(),
+        key,
+        name: file.name,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        status: "processing",
+        error: "",
+        uploadedUrl: "",
+      });
+    }
+    const overflow = picked.filter((f) => f.type.startsWith("image/")).length - remaining;
+    if (overflow > 0) {
+      notes.push(ta.photosLimitTrimmed.replace("{n}", String(remaining)).replace("{s}", remaining === 1 ? "" : "s"));
+    }
+    setImgNote(notes.join(" "));
+    if (accepted.length === 0) return;
+
+    setImages((prev) => [...prev, ...accepted]);
+    setImgBusy((b) => b + accepted.length);
+    accepted.forEach((item) => processImage(item));
+  }
+
+  function removeImage(id) {
+    const found = imagesRef.current.find((x) => x.id === id);
+    if (found?.previewUrl) URL.revokeObjectURL(found.previewUrl);
+    setImages((prev) => prev.filter((x) => x.id !== id));
+    setImgNote("");
+  }
+
+  function resetFormAndImages() {
+    imagesRef.current.forEach((x) => x.previewUrl && URL.revokeObjectURL(x.previewUrl));
+    setImages([]);
+    setImgNote("");
+    formRef.current?.reset();
+  }
+
+  function discardDraft() {
+    clearDraft();
+    setDraftRestored(false);
+    setDraft({});
+    setCategory("venues");
+    setGovernorate("");
+    resetFormAndImages();
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setErrorMsg("");
     const f = e.target;
 
-    // Client-side sanity checks beyond the HTML `required` attributes.
+    // Client-side sanity checks beyond the HTML `required` attributes. These
+    // early returns NEVER touch entered data or selected photos.
     const priceMin = Number(f.price_min?.value || 0);
     const priceMax = Number(f.price_max?.value || 0);
-    if (priceMin <= 0) {
-      setStatus("error");
-      setErrorMsg(ta.errPrice);
-      return;
-    }
+    if (priceMin <= 0) { setStatus("error"); setErrorMsg(ta.errPrice); return; }
     if (isVenue) {
       const capMin = Number(f.capacityMin?.value || 0);
       const capMax = Number(f.capacityMax?.value || 0);
-      if (capMax < capMin) {
-        setStatus("error");
-        setErrorMsg(ta.errCapacity);
-        return;
-      }
+      if (capMax < capMin) { setStatus("error"); setErrorMsg(ta.errCapacity); return; }
     }
-    // Required authorization confirmation.
-    if (!f.authorization.checked) {
-      setStatus("error");
-      setErrorMsg(ta.errAuth);
-      return;
+    if (!f.authorization.checked) { setStatus("error"); setErrorMsg(ta.errAuth); return; }
+
+    // Photo guards: don't submit mid-processing or with failed photos.
+    if (imgBusy > 0) { setStatus("error"); setErrorMsg(ta.photosStillProcessing); return; }
+    if (imagesRef.current.some((x) => x.status === "error")) {
+      setStatus("error"); setErrorMsg(ta.photosFixErrors); return;
     }
 
     setStatus("sending");
     try {
-      let images;
-      try {
-        const uploaded = await uploadImages(f.images.files, ta.errImages);
-        images = uploaded.length > 0 ? uploaded : [PLACEHOLDER_IMAGE];
-      } catch (e) {
-        throw new Error(e.message === "__count_images__" ? ta.errTooManyImages : ta.errImages);
+      // Upload photos one by one. Already-uploaded ones (from a previous failed
+      // attempt) are skipped so a retry never re-uploads or duplicates.
+      let images = [PLACEHOLDER_IMAGE];
+      const items = imagesRef.current;
+      if (items.length > 0) {
+        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+          images = [PLACEHOLDER_IMAGE];
+        } else {
+          const supabase = createSupabaseBrowserClient();
+          const urls = [];
+          const failed = [];
+          for (const item of items) {
+            if (item.uploadedUrl) { urls.push(item.uploadedUrl); continue; }
+            try {
+              const url = await putImage(supabase, item.file);
+              urls.push(url);
+              // Remember success so a later retry skips this file.
+              setImages((prev) => prev.map((x) => (x.id === item.id ? { ...x, uploadedUrl: url } : x)));
+            } catch {
+              failed.push(item.name);
+            }
+          }
+          if (failed.length > 0) {
+            throw new Error(ta.photosUploadFailed.replace("{n}", String(failed.length)).replace("{s}", failed.length === 1 ? "" : "s"));
+          }
+          images = urls.length > 0 ? urls : [PLACEHOLDER_IMAGE];
+        }
       }
 
       // Optional, private verification proof (separate from public Photos).
       let verification_docs = [];
       try {
         verification_docs = await uploadProofDocs(f.proof.files, ta.errProof);
-      } catch (e) {
-        throw new Error(e.message === "__count_docs__" ? ta.errTooManyDocs : ta.errProof);
+      } catch (e2) {
+        throw new Error(e2.message === "__count_docs__" ? ta.errTooManyDocs : ta.errProof);
       }
 
       const payload = {
@@ -195,9 +395,12 @@ function AddVenueInner() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || ta.errSave);
       }
+      // Success ONLY now: clear the draft + wipe the form + photos.
+      clearDraft();
+      resetFormAndImages();
       setStatus("sent");
-      f.reset();
     } catch (err) {
+      // Any failure preserves the form, the draft, and the (uploaded) photos.
       setStatus("error");
       setErrorMsg(err.message || ta.errGeneric);
     }
@@ -217,14 +420,27 @@ function AddVenueInner() {
     );
   }
 
+  if (!ready) {
+    return <div className="max-w-2xl mx-auto px-5 py-14 text-cream/50">{ta.loading}</div>;
+  }
+
   return (
     <div className="max-w-2xl mx-auto px-5 py-14">
       <p className="text-brass-deep text-sm font-semibold uppercase tracking-wide mb-2">{ta.eyebrow}</p>
       <h1 className="font-display text-3xl text-cream mb-2">{ta.title}</h1>
       <p className="text-cream/60 mb-8">{ta.subtitle}</p>
 
-      <form onSubmit={handleSubmit} className="space-y-5 bg-surface border border-hair rounded-2xl p-6 md:p-8">
-        <Field label={ta.venueName} name="name" required />
+      {draftRestored && (
+        <div className="flex items-center justify-between gap-3 bg-emerald/10 border border-emerald/30 text-emerald rounded-xl px-4 py-2.5 mb-5 text-sm">
+          <span>{ta.draftRestored}</span>
+          <button type="button" onClick={discardDraft} className="text-xs font-semibold underline hover:no-underline shrink-0">
+            {ta.draftDiscard}
+          </button>
+        </div>
+      )}
+
+      <form ref={formRef} onSubmit={handleSubmit} onInput={scheduleSave} onChange={scheduleSave} className="space-y-5 bg-surface border border-hair rounded-2xl p-6 md:p-8">
+        <Field label={ta.venueName} name="name" required defaultValue={draft.name} />
 
         {/* Category */}
         <div>
@@ -247,7 +463,7 @@ function AddVenueInner() {
           </div>
           <div>
             <Label>{ta.cityArea}</Label>
-            <select name="city_id" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+            <select name="city_id" defaultValue={draft.city_id} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
               <option value="">—</option>
               {cityOptions.map((c) => <option key={c.id} value={c.id}>{locale === "ar" ? c.name_ar : c.name_en}</option>)}
             </select>
@@ -255,14 +471,14 @@ function AddVenueInner() {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label={ta.city} name="city" required />
-          <Field label={ta.area} name="area" required />
+          <Field label={ta.city} name="city" required defaultValue={draft.city} />
+          <Field label={ta.area} name="area" required defaultValue={draft.area} />
         </div>
 
         {/* Price (all categories) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Field label={ta.startingPrice} name="price_min" type="number" required />
-          <Field label={ta.priceMax} name="price_max" type="number" />
+          <Field label={ta.startingPrice} name="price_min" type="number" required defaultValue={draft.price_min} />
+          <Field label={ta.priceMax} name="price_max" type="number" defaultValue={draft.price_max} />
         </div>
 
         {/* Venue-only fields */}
@@ -271,28 +487,28 @@ function AddVenueInner() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>{ta.venueType}</Label>
-                <select name="type" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+                <select name="type" defaultValue={draft.type} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
                   {["Hotel", "Hall", "Garden", "Villa", "Rooftop", "Restaurant"].map((v) => <option key={v} value={v}>{tv("type", v)}</option>)}
                 </select>
               </div>
               <div>
                 <Label>{ta.setting}</Label>
-                <select name="indoorOutdoor" className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
+                <select name="indoorOutdoor" defaultValue={draft.indoorOutdoor} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface">
                   {["Indoor", "Outdoor", "Both"].map((v) => <option key={v} value={v}>{tv("setting", v)}</option>)}
                 </select>
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={ta.minCapacity} name="capacityMin" type="number" />
-              <Field label={ta.maxCapacity} name="capacityMax" type="number" />
+              <Field label={ta.minCapacity} name="capacityMin" type="number" defaultValue={draft.capacityMin} />
+              <Field label={ta.maxCapacity} name="capacityMax" type="number" defaultValue={draft.capacityMax} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={ta.halls} name="halls" type="number" />
-              <Field label={ta.venueSize} name="venueSize" type="number" />
+              <Field label={ta.halls} name="halls" type="number" defaultValue={draft.halls} />
+              <Field label={ta.venueSize} name="venueSize" type="number" defaultValue={draft.venueSize} />
             </div>
             <div>
               <Label>{ta.suitableFor}</Label>
-              <select name="suitableFor" multiple className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface h-28">
+              <select name="suitableFor" multiple defaultValue={draft.suitableFor || []} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface h-28">
                 {["Wedding", "Engagement", "Birthday", "Corporate Event"].map((e) => <option key={e} value={e}>{tv("event", e)}</option>)}
               </select>
             </div>
@@ -301,19 +517,56 @@ function AddVenueInner() {
 
         <div>
           <Label>{ta.description}</Label>
-          <textarea name="description" rows={4} required className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
+          <textarea name="description" rows={4} required defaultValue={draft.description} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
         </div>
 
+        {/* Photos — managed uploader with live previews */}
         <div>
           <Label>{ta.photos}</Label>
           <input
-            name="images"
             type="file"
             accept="image/*"
             multiple
-            className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface file:me-3 file:rounded-full file:border-0 file:bg-emerald file:text-cream file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+            onChange={onSelectImages}
+            disabled={images.length >= MAX_IMAGES}
+            className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface file:me-3 file:rounded-full file:border-0 file:bg-emerald file:text-cream file:px-3 file:py-1.5 file:text-xs file:font-semibold disabled:opacity-50"
           />
-          <p className="text-xs text-cream/40 mt-1">{ta.photosHint}</p>
+          <div className="flex items-center justify-between gap-2 mt-1">
+            <p className="text-xs text-cream/40">{ta.photosHint}</p>
+            {images.length > 0 && (
+              <span className="text-xs text-cream/50 shrink-0">{ta.photosCount.replace("{n}", String(images.length))}</span>
+            )}
+          </div>
+          {imgBusy > 0 && (
+            <p className="text-xs text-brass-deep mt-2">
+              {ta.photosProcessing.replace("{n}", String(imgBusy)).replace("{s}", imgBusy === 1 ? "" : "s")}
+            </p>
+          )}
+          {imgNote && <p className="text-xs text-red-600 mt-2">{imgNote}</p>}
+
+          {images.length > 0 && (
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 mt-3">
+              {images.map((img) => (
+                <div key={img.id} className={`relative aspect-square rounded-lg overflow-hidden border ${img.status === "error" ? "border-red-400" : "border-hair"}`}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.previewUrl} alt={img.name} className="w-full h-full object-cover" />
+                  {img.status !== "ready" && (
+                    <div className={`absolute inset-0 flex items-center justify-center text-center px-1 text-[10px] font-semibold ${img.status === "error" ? "bg-red-900/60 text-white" : "bg-night/50 text-cream"}`}>
+                      {img.status === "error" ? (img.error || ta.photoErrorBadge) : ta.photoProcessingBadge}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(img.id)}
+                    aria-label={ta.removePhoto}
+                    className="absolute top-1 end-1 w-6 h-6 rounded-full bg-night/70 text-white text-xs font-bold flex items-center justify-center hover:bg-red-600 transition"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {isVenue && (
@@ -322,7 +575,7 @@ function AddVenueInner() {
             <div className="grid grid-cols-2 gap-2 mt-1">
               {AMENITY_KEYS.map((key) => (
                 <label key={key} className="flex items-center gap-2 text-sm text-cream/70">
-                  <input type="checkbox" name={key} className="accent-emerald" />
+                  <input type="checkbox" name={key} defaultChecked={draft[key] === true} className="accent-emerald" />
                   {t.detail.amenityLabels[key]}
                 </label>
               ))}
@@ -334,16 +587,16 @@ function AddVenueInner() {
           <Label>{ta.ownerDetails}</Label>
           <p className="text-xs text-cream/40 mb-3">{ta.ownerHint}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Field label={ta.ownerName} name="owner_name" />
-            <Field label={ta.ownerRole} name="owner_role" />
-            <Field label={ta.ownerEmail} name="owner_email" type="email" />
-            <Field label={ta.ownerPhone} name="owner_phone" type="tel" />
-            <Field label={ta.ownerWhatsapp} name="owner_whatsapp" type="tel" />
-            <Field label={ta.officialWebsite} name="official_website" />
-            <Field label={ta.googleMaps} name="google_maps_link" />
+            <Field label={ta.ownerName} name="owner_name" defaultValue={draft.owner_name} />
+            <Field label={ta.ownerRole} name="owner_role" defaultValue={draft.owner_role} />
+            <Field label={ta.ownerEmail} name="owner_email" type="email" defaultValue={draft.owner_email} />
+            <Field label={ta.ownerPhone} name="owner_phone" type="tel" defaultValue={draft.owner_phone} />
+            <Field label={ta.ownerWhatsapp} name="owner_whatsapp" type="tel" defaultValue={draft.owner_whatsapp} />
+            <Field label={ta.officialWebsite} name="official_website" defaultValue={draft.official_website} />
+            <Field label={ta.googleMaps} name="google_maps_link" defaultValue={draft.google_maps_link} />
           </div>
           <div className="mt-4">
-            <Field label={ta.socialLink} name="social_link" />
+            <Field label={ta.socialLink} name="social_link" defaultValue={draft.social_link} />
           </div>
 
           <div className="mt-4">
@@ -373,7 +626,7 @@ function AddVenueInner() {
         </label>
 
         <button
-          disabled={status === "sending"}
+          disabled={status === "sending" || imgBusy > 0}
           className="w-full bg-emerald text-onnight font-semibold py-3.5 rounded-full hover:opacity-90 transition disabled:opacity-50"
         >
           {status === "sending" ? ta.submitting : ta.submit}
@@ -396,11 +649,11 @@ function Label({ children }) {
   return <label className="text-sm font-medium text-cream/70 block mb-1.5">{children}</label>;
 }
 
-function Field({ label, name, type = "text", required }) {
+function Field({ label, name, type = "text", required, defaultValue }) {
   return (
     <div>
       <Label>{label}</Label>
-      <input name={name} type={type} required={required} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
+      <input name={name} type={type} required={required} defaultValue={defaultValue} className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm" />
     </div>
   );
 }
