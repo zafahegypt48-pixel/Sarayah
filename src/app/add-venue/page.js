@@ -5,15 +5,21 @@ import { useSearchParams } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser";
 import { useI18n } from "@/lib/i18n/client";
 import {
-  compressImageToFit, isAllowedImageType, MAX_IMAGE_BYTES, MAX_DOC_BYTES, MAX_IMAGES, MAX_DOCS,
+  compressImageToFit, isAllowedImageType, isAllowedDocType, safeUUID, formatMB,
+  MAX_IMAGE_BYTES, MAX_DOC_BYTES, MAX_IMAGES, MAX_DOCS,
 } from "@/lib/upload";
 
 const PLACEHOLDER_IMAGE =
   "https://images.unsplash.com/photo-1519225421980-715cb0215aed?w=1200&q=80";
 
+// Process at most this many images at once — bounds memory on low-end Android.
+const PROCESS_CONCURRENCY = 3;
+
 // Versioned draft key — bump the suffix if the field shape changes so old drafts
 // are ignored rather than mis-restored.
 const DRAFT_KEY = "sarayah_add_venue_draft_v1";
+// Sensitive contact fields are NEVER written to localStorage.
+const DRAFT_SKIP = new Set(["authorization", "owner_email", "owner_phone", "owner_whatsapp"]);
 
 function readDraft() {
   if (typeof window === "undefined") return null;
@@ -31,7 +37,7 @@ function writeDraft(data) {
   try {
     // Only persist once the user has typed something meaningful, so an untouched
     // visit (which still has default select values) doesn't leave a stale draft.
-    const meaningful = ["name", "description", "city", "area", "price_min", "owner_name", "owner_phone", "owner_email"];
+    const meaningful = ["name", "description", "city", "area", "price_min", "owner_name"];
     const hasContent = meaningful.some((k) => data[k] && String(data[k]).trim());
     if (hasContent) window.localStorage.setItem(DRAFT_KEY, JSON.stringify(data));
   } catch { /* quota / private mode — ignore, autosave is best-effort */ }
@@ -41,12 +47,12 @@ function clearDraft() {
   try { window.localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 }
 
-// Snapshot the form's text/select/checkbox values (NEVER files, never the legal
-// authorization checkbox). Used for localStorage autosave.
+// Snapshot the form's text/select/checkbox values. NEVER files, the legal
+// authorization checkbox, or sensitive contact fields (email/phone/whatsapp).
 function serializeForm(formEl) {
   const out = {};
   for (const el of formEl.elements) {
-    if (!el.name || el.name === "authorization") continue;
+    if (!el.name || DRAFT_SKIP.has(el.name)) continue;
     if (el.type === "file" || el.type === "submit" || el.type === "button") continue;
     if (el.type === "checkbox") out[el.name] = el.checked;
     else if (el.multiple && el.tagName === "SELECT") out[el.name] = Array.from(el.selectedOptions).map((o) => o.value);
@@ -55,11 +61,10 @@ function serializeForm(formEl) {
   return out;
 }
 
-// Upload ONE already-processed image file to the public venue-images bucket and
-// return its public URL. Per-file so one failure never aborts the others.
+// Upload ONE already-processed image to the public venue-images bucket → public URL.
 async function putImage(supabase, file) {
   const ext = (file.name.split(".").pop() || "jpg").toLowerCase();
-  const path = `${crypto.randomUUID()}.${ext}`;
+  const path = `${safeUUID()}.${ext}`;
   const { error } = await supabase.storage
     .from("venue-images")
     .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
@@ -67,27 +72,15 @@ async function putImage(supabase, file) {
   return supabase.storage.from("venue-images").getPublicUrl(path).data.publicUrl;
 }
 
-// Upload OPTIONAL verification proof to the PRIVATE `venue-docs` bucket. These are
-// NOT public — only admins can read them (via signed URLs). Returns object paths
-// (not public URLs). Separate from venue Photos above.
-async function uploadProofDocs(files, oversizeError) {
-  if (!files || files.length === 0) return [];
-  if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return [];
-  if (files.length > MAX_DOCS) throw new Error("__count_docs__");
-  const supabase = createSupabaseBrowserClient();
-  const paths = [];
-  for (const file of files) {
-    // Documents (incl. PDFs) are uploaded as-is — validate size, never re-encode.
-    if (file.size > MAX_DOC_BYTES) throw new Error(oversizeError);
-    const ext = (file.name.split(".").pop() || "dat").toLowerCase();
-    const path = `proof/${crypto.randomUUID()}.${ext}`;
-    const { error } = await supabase.storage
-      .from("venue-docs")
-      .upload(path, file, { cacheControl: "3600", upsert: false });
-    if (error) throw error;
-    paths.push(path);
-  }
-  return paths;
+// Upload ONE verification document to the PRIVATE venue-docs bucket → object path.
+async function putDoc(supabase, file) {
+  const ext = (file.name.split(".").pop() || "dat").toLowerCase();
+  const path = `proof/${safeUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from("venue-docs")
+    .upload(path, file, { cacheControl: "3600", upsert: false, contentType: file.type });
+  if (error) throw error;
+  return path;
 }
 
 const AMENITY_KEYS = ["catering", "parking", "bridalRoom", "dj", "decoration", "kidsArea", "ac", "valet"];
@@ -104,31 +97,35 @@ function AddVenueInner() {
   const [governorate, setGovernorate] = useState("");
   const params = useSearchParams();
 
-  // Draft restore gating: render the form only once we've read localStorage, so
-  // defaultValue on every field can seed from the saved draft on mount.
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState({});
   const [draftRestored, setDraftRestored] = useState(false);
 
   // Managed image state — [{ id, key, name, file, previewUrl, status, error, uploadedUrl }]
   const [images, setImages] = useState([]);
-  const [imgBusy, setImgBusy] = useState(0); // # of files still being processed
+  const [imgBusy, setImgBusy] = useState(0);
   const [imgNote, setImgNote] = useState("");
   const imagesRef = useRef([]);
+  // Bounded processing queue (memory safety on mobile).
+  const queueRef = useRef([]);
+  const activeRef = useRef(0);
+
+  // Managed document state — [{ id, key, name, size, type, file, uploadedPath }]
+  const [docs, setDocs] = useState([]);
+  const [docNote, setDocNote] = useState("");
+  const docsRef = useRef([]);
+
   const formRef = useRef(null);
   const saveTimer = useRef(null);
   useEffect(() => { imagesRef.current = images; }, [images]);
+  useEffect(() => { docsRef.current = docs; }, [docs]);
 
-  // Load categories + locations for the selectors.
   useEffect(() => {
     fetch("/api/categories").then((r) => (r.ok ? r.json() : [])).then(setCats).catch(() => {});
     fetch("/api/locations").then((r) => (r.ok ? r.json() : { governorates: [], cities: [] }))
       .then((d) => { setGovs(d.governorates || []); setCities(d.cities || []); }).catch(() => {});
   }, []);
 
-  // Restore an in-progress draft (client only). category/governorate are
-  // controlled selects, so they restore into state; every other field restores
-  // via defaultValue once `ready` flips true.
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect -- one-time restore from localStorage on mount */
     const d = readDraft();
@@ -142,14 +139,13 @@ function AddVenueInner() {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  // Revoke all preview object URLs on unmount (avoid memory leaks). Reads the ref
-  // so it always sees the latest list.
+  // Revoke all preview object URLs on unmount.
   useEffect(() => () => {
     imagesRef.current.forEach((x) => x.previewUrl && URL.revokeObjectURL(x.previewUrl));
   }, []);
 
-  // Persist the draft when the tab is hidden/closed (covers the mobile case where
-  // opening the camera backgrounds and reloads the tab).
+  // Persist the draft when the tab is hidden/closed (covers the mobile camera
+  // backgrounding the tab).
   useEffect(() => {
     const save = () => { if (formRef.current) writeDraft(serializeForm(formRef.current)); };
     window.addEventListener("pagehide", save);
@@ -162,11 +158,9 @@ function AddVenueInner() {
 
   const cityOptions = cities.filter((c) => !governorate || c.governorate_id === governorate);
   const isVenue = category === "venues";
-  // Outreach attribution (from WhatsApp registration links).
   const source = params.get("source") === "whatsapp" ? "whatsapp_outreach" : "public";
   const prospectId = params.get("prospect_id") || "";
 
-  // Track that a WhatsApp prospect opened the registration link (best-effort).
   useEffect(() => {
     if (prospectId) {
       fetch("/api/outreach/register-click", {
@@ -177,7 +171,6 @@ function AddVenueInner() {
     }
   }, [prospectId]);
 
-  // Debounced autosave on any field edit.
   function scheduleSave() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
@@ -185,38 +178,50 @@ function AddVenueInner() {
     }, 500);
   }
 
-  // Process one accepted image: optimise/convert as needed, then flip its status.
-  // Fully isolated — a failure here never touches the other images.
+  // ---- Images ------------------------------------------------------------
+  function pumpImageQueue() {
+    while (activeRef.current < PROCESS_CONCURRENCY && queueRef.current.length > 0) {
+      const item = queueRef.current.shift();
+      activeRef.current += 1;
+      processImage(item);
+    }
+  }
+
   async function processImage(item) {
     try {
       const allowed = isAllowedImageType(item.file.type);
       const optimized = await compressImageToFit(item.file, {
         maxBytes: MAX_IMAGE_BYTES,
-        // Convert decodable-but-unsupported types (HEIC/BMP/…) to WebP; never
-        // re-encode GIFs (would drop animation).
         reencodeAlways: !allowed && item.file.type !== "image/gif",
       });
       let error = "";
-      if (optimized.size > MAX_IMAGE_BYTES) {
-        error = ta.photosTooLarge.replace("{name}", item.name);
-      } else if (!isAllowedImageType(optimized.type)) {
-        error = ta.photosUnsupported.replace("{name}", item.name);
+      if (optimized.size > MAX_IMAGE_BYTES) error = ta.photosTooLarge.replace("{name}", item.name);
+      else if (!isAllowedImageType(optimized.type)) error = ta.photosUnsupported.replace("{name}", item.name);
+
+      // If we re-encoded, swap the preview to the smaller file and release the
+      // original blob — but only if the item still exists (not removed mid-run).
+      let newPreview = "";
+      if (!error && optimized !== item.file && imagesRef.current.some((x) => x.id === item.id)) {
+        newPreview = URL.createObjectURL(optimized);
+        URL.revokeObjectURL(item.previewUrl);
       }
       setImages((prev) => prev.map((x) =>
-        x.id === item.id ? { ...x, file: optimized, status: error ? "error" : "ready", error } : x));
+        x.id === item.id
+          ? { ...x, file: optimized, previewUrl: newPreview || x.previewUrl, status: error ? "error" : "ready", error }
+          : x));
     } catch {
       setImages((prev) => prev.map((x) =>
         x.id === item.id ? { ...x, status: "error", error: ta.photosProcessFail.replace("{name}", item.name) } : x));
     } finally {
+      activeRef.current = Math.max(0, activeRef.current - 1);
       setImgBusy((b) => Math.max(0, b - 1));
+      pumpImageQueue();
     }
   }
 
-  // Handle a batch (or single) file selection. Appends to existing photos, dedupes
-  // identical files, enforces the 12-image cap, and starts async processing.
   function onSelectImages(e) {
     const picked = Array.from(e.target.files || []);
-    e.target.value = ""; // reset so re-picking the same file fires change again
+    e.target.value = "";
     if (picked.length === 0) return;
 
     const current = imagesRef.current;
@@ -229,46 +234,74 @@ function AddVenueInner() {
     for (const file of picked) {
       if (accepted.length >= remaining) break;
       const key = `${file.name}:${file.size}:${file.lastModified}`;
-      if (seen.has(key)) continue; // ignore duplicate / double-tap of same file
-      if (!file.type.startsWith("image/")) {
-        notes.push(ta.photosUnsupported.replace("{name}", file.name));
-        continue;
-      }
+      if (seen.has(key)) continue;
+      if (!file.type.startsWith("image/")) { notes.push(ta.photosUnsupported.replace("{name}", file.name)); continue; }
       seen.add(key);
       accepted.push({
-        id: crypto.randomUUID(),
-        key,
-        name: file.name,
-        file,
-        previewUrl: URL.createObjectURL(file),
-        status: "processing",
-        error: "",
-        uploadedUrl: "",
+        id: safeUUID(), key, name: file.name, file,
+        previewUrl: URL.createObjectURL(file), status: "processing", error: "", uploadedUrl: "",
       });
     }
     const overflow = picked.filter((f) => f.type.startsWith("image/")).length - remaining;
-    if (overflow > 0) {
-      notes.push(ta.photosLimitTrimmed.replace("{n}", String(remaining)).replace("{s}", remaining === 1 ? "" : "s"));
-    }
+    if (overflow > 0) notes.push(ta.photosLimitTrimmed.replace("{n}", String(remaining)).replace("{s}", remaining === 1 ? "" : "s"));
     setImgNote(notes.join(" "));
     if (accepted.length === 0) return;
 
     setImages((prev) => [...prev, ...accepted]);
     setImgBusy((b) => b + accepted.length);
-    accepted.forEach((item) => processImage(item));
+    queueRef.current.push(...accepted);
+    pumpImageQueue();
   }
 
   function removeImage(id) {
     const found = imagesRef.current.find((x) => x.id === id);
     if (found?.previewUrl) URL.revokeObjectURL(found.previewUrl);
+    // Drop from the pending queue too, so a not-yet-started item doesn't process.
+    queueRef.current = queueRef.current.filter((x) => x.id !== id);
     setImages((prev) => prev.filter((x) => x.id !== id));
     setImgNote("");
   }
 
-  function resetFormAndImages() {
+  // ---- Documents ---------------------------------------------------------
+  function onSelectDocs(e) {
+    const picked = Array.from(e.target.files || []);
+    e.target.value = "";
+    if (picked.length === 0) return;
+
+    const current = docsRef.current;
+    const remaining = MAX_DOCS - current.length;
+    if (remaining <= 0) { setDocNote(ta.docsLimitReached); return; }
+
+    const seen = new Set(current.map((it) => it.key));
+    const notes = [];
+    const accepted = [];
+    for (const file of picked) {
+      if (accepted.length >= remaining) break;
+      const key = `${file.name}:${file.size}:${file.lastModified}`;
+      if (seen.has(key)) continue;
+      if (!isAllowedDocType(file.type)) { notes.push(ta.docUnsupported.replace("{name}", file.name)); continue; }
+      if (file.size > MAX_DOC_BYTES) { notes.push(ta.docTooLarge.replace("{name}", file.name)); continue; }
+      seen.add(key);
+      accepted.push({ id: safeUUID(), key, name: file.name, size: file.size, type: file.type, file, uploadedPath: "" });
+    }
+    const overflow = picked.length - remaining;
+    if (overflow > 0) notes.push(ta.docsLimitTrimmed.replace("{n}", String(remaining)).replace("{s}", remaining === 1 ? "" : "s"));
+    setDocNote(notes.join(" "));
+    if (accepted.length === 0) return;
+    setDocs((prev) => [...prev, ...accepted]);
+  }
+
+  function removeDoc(id) {
+    setDocs((prev) => prev.filter((x) => x.id !== id));
+    setDocNote("");
+  }
+
+  function resetFormAndUploads() {
     imagesRef.current.forEach((x) => x.previewUrl && URL.revokeObjectURL(x.previewUrl));
-    setImages([]);
-    setImgNote("");
+    queueRef.current = [];
+    activeRef.current = 0;
+    setImages([]); setImgNote(""); setImgBusy(0);
+    setDocs([]); setDocNote("");
     formRef.current?.reset();
   }
 
@@ -278,7 +311,7 @@ function AddVenueInner() {
     setDraft({});
     setCategory("venues");
     setGovernorate("");
-    resetFormAndImages();
+    resetFormAndUploads();
   }
 
   async function handleSubmit(e) {
@@ -286,8 +319,6 @@ function AddVenueInner() {
     setErrorMsg("");
     const f = e.target;
 
-    // Client-side sanity checks beyond the HTML `required` attributes. These
-    // early returns NEVER touch entered data or selected photos.
     const priceMin = Number(f.price_min?.value || 0);
     const priceMax = Number(f.price_max?.value || 0);
     if (priceMin <= 0) { setStatus("error"); setErrorMsg(ta.errPrice); return; }
@@ -298,49 +329,45 @@ function AddVenueInner() {
     }
     if (!f.authorization.checked) { setStatus("error"); setErrorMsg(ta.errAuth); return; }
 
-    // Photo guards: don't submit mid-processing or with failed photos.
     if (imgBusy > 0) { setStatus("error"); setErrorMsg(ta.photosStillProcessing); return; }
-    if (imagesRef.current.some((x) => x.status === "error")) {
-      setStatus("error"); setErrorMsg(ta.photosFixErrors); return;
-    }
+    if (imagesRef.current.some((x) => x.status === "error")) { setStatus("error"); setErrorMsg(ta.photosFixErrors); return; }
 
     setStatus("sending");
     try {
-      // Upload photos one by one. Already-uploaded ones (from a previous failed
-      // attempt) are skipped so a retry never re-uploads or duplicates.
+      const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL ? createSupabaseBrowserClient() : null;
+
+      // Photos — upload one by one; skip already-uploaded (retry-safe).
       let images = [PLACEHOLDER_IMAGE];
-      const items = imagesRef.current;
-      if (items.length > 0) {
-        if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
-          images = [PLACEHOLDER_IMAGE];
-        } else {
-          const supabase = createSupabaseBrowserClient();
-          const urls = [];
-          const failed = [];
-          for (const item of items) {
-            if (item.uploadedUrl) { urls.push(item.uploadedUrl); continue; }
-            try {
-              const url = await putImage(supabase, item.file);
-              urls.push(url);
-              // Remember success so a later retry skips this file.
-              setImages((prev) => prev.map((x) => (x.id === item.id ? { ...x, uploadedUrl: url } : x)));
-            } catch {
-              failed.push(item.name);
-            }
-          }
-          if (failed.length > 0) {
-            throw new Error(ta.photosUploadFailed.replace("{n}", String(failed.length)).replace("{s}", failed.length === 1 ? "" : "s"));
-          }
-          images = urls.length > 0 ? urls : [PLACEHOLDER_IMAGE];
+      const imgItems = imagesRef.current;
+      if (imgItems.length > 0 && supabase) {
+        const urls = [];
+        const failed = [];
+        for (const item of imgItems) {
+          if (item.uploadedUrl) { urls.push(item.uploadedUrl); continue; }
+          try {
+            const url = await putImage(supabase, item.file);
+            urls.push(url);
+            setImages((prev) => prev.map((x) => (x.id === item.id ? { ...x, uploadedUrl: url } : x)));
+          } catch { failed.push(item.name); }
         }
+        if (failed.length > 0) throw new Error(ta.photosUploadFailed.replace("{n}", String(failed.length)).replace("{s}", failed.length === 1 ? "" : "s"));
+        images = urls.length > 0 ? urls : [PLACEHOLDER_IMAGE];
       }
 
-      // Optional, private verification proof (separate from public Photos).
-      let verification_docs = [];
-      try {
-        verification_docs = await uploadProofDocs(f.proof.files, ta.errProof);
-      } catch (e2) {
-        throw new Error(e2.message === "__count_docs__" ? ta.errTooManyDocs : ta.errProof);
+      // Verification documents — upload one by one; skip already-uploaded.
+      const verification_docs = [];
+      const docItems = docsRef.current;
+      if (docItems.length > 0 && supabase) {
+        const failedDocs = [];
+        for (const d of docItems) {
+          if (d.uploadedPath) { verification_docs.push(d.uploadedPath); continue; }
+          try {
+            const p = await putDoc(supabase, d.file);
+            verification_docs.push(p);
+            setDocs((prev) => prev.map((x) => (x.id === d.id ? { ...x, uploadedPath: p } : x)));
+          } catch { failedDocs.push(d.name); }
+        }
+        if (failedDocs.length > 0) throw new Error(ta.docsUploadFailed.replace("{n}", String(failedDocs.length)).replace("{s}", failedDocs.length === 1 ? "" : "s"));
       }
 
       const payload = {
@@ -354,7 +381,6 @@ function AddVenueInner() {
         price_max: priceMax || undefined,
         description: f.description.value,
         images,
-        // Contact / proof details for admin verification (optional).
         owner_name: f.owner_name.value,
         owner_role: f.owner_role.value,
         owner_email: f.owner_email.value,
@@ -363,14 +389,11 @@ function AddVenueInner() {
         official_website: f.official_website.value,
         google_maps_link: f.google_maps_link.value,
         social_link: f.social_link.value,
-        // Authorization confirmation + optional private proof doc paths.
         authorization_confirmed: true,
         verification_docs,
-        // Outreach attribution (server forces moderation status regardless).
         source,
         prospect_id: prospectId || undefined,
       };
-      // Venue-specific fields only apply to the Venues category.
       if (isVenue) {
         Object.assign(payload, {
           type: f.type.value,
@@ -384,7 +407,7 @@ function AddVenueInner() {
           ...AMENITY_KEYS.reduce((acc, key) => ({ ...acc, [key]: f[key]?.checked || false }), {}),
         });
       } else {
-        payload.startingPrice = priceMin; // keep legacy column populated
+        payload.startingPrice = priceMin;
       }
       const res = await fetch("/api/venues", {
         method: "POST",
@@ -395,12 +418,10 @@ function AddVenueInner() {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || ta.errSave);
       }
-      // Success ONLY now: clear the draft + wipe the form + photos.
       clearDraft();
-      resetFormAndImages();
+      resetFormAndUploads();
       setStatus("sent");
     } catch (err) {
-      // Any failure preserves the form, the draft, and the (uploaded) photos.
       setStatus("error");
       setErrorMsg(err.message || ta.errGeneric);
     }
@@ -410,9 +431,7 @@ function AddVenueInner() {
     return (
       <div className="max-w-xl mx-auto px-5 py-24 text-center">
         <h1 className="font-display text-3xl text-emerald mb-3">{ta.sentTitle}</h1>
-        <p className="text-cream/60">
-          {ta.sentBody}
-        </p>
+        <p className="text-cream/60">{ta.sentBody}</p>
         <Link href="/venues" className="inline-block mt-6 text-sm font-semibold bg-emerald text-onnight px-6 py-3 rounded-full hover:opacity-90 transition">
           {ta.browse}
         </Link>
@@ -442,7 +461,6 @@ function AddVenueInner() {
       <form ref={formRef} onSubmit={handleSubmit} onInput={scheduleSave} onChange={scheduleSave} className="space-y-5 bg-surface border border-hair rounded-2xl p-6 md:p-8">
         <Field label={ta.venueName} name="name" required defaultValue={draft.name} />
 
-        {/* Category */}
         <div>
           <Label>{ta.category}</Label>
           <select name="category_id" value={category} onChange={(e) => setCategory(e.target.value)}
@@ -451,7 +469,6 @@ function AddVenueInner() {
           </select>
         </div>
 
-        {/* Location (governorate + city from the reference tables) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <Label>{ta.governorate}</Label>
@@ -475,13 +492,11 @@ function AddVenueInner() {
           <Field label={ta.area} name="area" required defaultValue={draft.area} />
         </div>
 
-        {/* Price (all categories) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <Field label={ta.startingPrice} name="price_min" type="number" required defaultValue={draft.price_min} />
           <Field label={ta.priceMax} name="price_max" type="number" defaultValue={draft.price_max} />
         </div>
 
-        {/* Venue-only fields */}
         {isVenue && (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -589,9 +604,9 @@ function AddVenueInner() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label={ta.ownerName} name="owner_name" defaultValue={draft.owner_name} />
             <Field label={ta.ownerRole} name="owner_role" defaultValue={draft.owner_role} />
-            <Field label={ta.ownerEmail} name="owner_email" type="email" defaultValue={draft.owner_email} />
-            <Field label={ta.ownerPhone} name="owner_phone" type="tel" defaultValue={draft.owner_phone} />
-            <Field label={ta.ownerWhatsapp} name="owner_whatsapp" type="tel" defaultValue={draft.owner_whatsapp} />
+            <Field label={ta.ownerEmail} name="owner_email" type="email" />
+            <Field label={ta.ownerPhone} name="owner_phone" type="tel" />
+            <Field label={ta.ownerWhatsapp} name="owner_whatsapp" type="tel" />
             <Field label={ta.officialWebsite} name="official_website" defaultValue={draft.official_website} />
             <Field label={ta.googleMaps} name="google_maps_link" defaultValue={draft.google_maps_link} />
           </div>
@@ -599,30 +614,50 @@ function AddVenueInner() {
             <Field label={ta.socialLink} name="social_link" defaultValue={draft.social_link} />
           </div>
 
+          {/* Verification documents — managed uploader (no image preview for PDFs) */}
           <div className="mt-4">
             <Label>{ta.proof}</Label>
             <input
-              name="proof"
               type="file"
-              accept="image/*,application/pdf"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
               multiple
-              className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface file:me-3 file:rounded-full file:border-0 file:bg-night file:text-cream file:px-3 file:py-1.5 file:text-xs file:font-semibold"
+              onChange={onSelectDocs}
+              disabled={docs.length >= MAX_DOCS}
+              className="w-full border border-hair rounded-lg px-3 py-2.5 text-sm bg-surface file:me-3 file:rounded-full file:border-0 file:bg-night file:text-cream file:px-3 file:py-1.5 file:text-xs file:font-semibold disabled:opacity-50"
             />
-            <p className="text-xs text-cream/40 mt-1">
-              {ta.proofHint}
-            </p>
+            <div className="flex items-center justify-between gap-2 mt-1">
+              <p className="text-xs text-cream/40">{ta.proofHint}</p>
+              {docs.length > 0 && (
+                <span className="text-xs text-cream/50 shrink-0">{ta.docsCount.replace("{n}", String(docs.length))}</span>
+              )}
+            </div>
+            {docNote && <p className="text-xs text-red-600 mt-2">{docNote}</p>}
+            {docs.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {docs.map((d) => {
+                  const isPdf = d.type === "application/pdf";
+                  return (
+                    <li key={d.id} className="flex items-center gap-3 border border-hair rounded-lg px-3 py-2 text-sm">
+                      <span className={`shrink-0 text-[10px] font-bold px-2 py-1 rounded ${isPdf ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"}`}>
+                        {isPdf ? "PDF" : "IMG"}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-cream/80">{d.name}</span>
+                      <span className="shrink-0 text-xs text-cream/45">{formatMB(d.size)}</span>
+                      <button type="button" onClick={() => removeDoc(d.id)} aria-label={ta.removeDoc}
+                        className="shrink-0 text-cream/40 hover:text-red-600 transition text-sm font-bold">✕</button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </div>
         </div>
 
-        <p className="text-xs text-cream/50 bg-night/5 rounded-lg p-3">
-          {ta.moderationNote}
-        </p>
+        <p className="text-xs text-cream/50 bg-night/5 rounded-lg p-3">{ta.moderationNote}</p>
 
         <label className="flex items-start gap-2.5 text-sm text-cream/70">
           <input type="checkbox" name="authorization" required className="accent-emerald mt-0.5" />
-          <span>
-            {ta.authConfirm} <span className="text-red-500">*</span>
-          </span>
+          <span>{ta.authConfirm} <span className="text-red-500">*</span></span>
         </label>
 
         <button

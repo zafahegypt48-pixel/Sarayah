@@ -19,6 +19,20 @@ export const formatMB = (bytes) => `${(bytes / MB).toFixed(0)} MB`;
 export const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 export const isAllowedImageType = (type) => ALLOWED_IMAGE_TYPES.includes(type);
 
+// Document (verification/proof) types the venue-docs bucket accepts.
+export const ALLOWED_DOC_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+export const isAllowedDocType = (type) => ALLOWED_DOC_TYPES.includes(type);
+
+// crypto.randomUUID() only exists in secure contexts (https) and modern engines.
+// Fall back to a collision-resistant-enough id so uploads never throw on older
+// mobile browsers or plain-http dev.
+export function safeUUID() {
+  try {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch { /* fall through */ }
+  return `id-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}${Math.random().toString(36).slice(2, 6)}`;
+}
+
 // Downscale + re-encode a large photo to fit under `maxBytes` WITHOUT visible
 // quality loss. Photos already within the dimension cap AND the byte budget are
 // returned untouched, so normal-sized uploads keep their exact original bytes.

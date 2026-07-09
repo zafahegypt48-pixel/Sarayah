@@ -471,6 +471,13 @@ const en = {
     photoErrorBadge: "Failed",
     draftRestored: "We restored your unsaved draft.",
     draftDiscard: "Discard draft",
+    docsCount: "{n}/6 files",
+    docsLimitReached: "You already have 6 files — remove one to add another.",
+    docsLimitTrimmed: "Only {n} more file{s} could be added (6 max).",
+    docUnsupported: "{name}: unsupported — use JPEG, PNG, WebP, or PDF.",
+    docTooLarge: "{name}: over 20 MB — please choose a smaller file.",
+    docsUploadFailed: "{n} document{s} failed to upload — nothing was lost, please submit again.",
+    removeDoc: "Remove",
   },
 
   report: {
@@ -1156,6 +1163,13 @@ const ar = {
     photoErrorBadge: "فشل",
     draftRestored: "استعدنا مسودتك غير المحفوظة.",
     draftDiscard: "تجاهل المسودة",
+    docsCount: "{n}/6 ملفات",
+    docsLimitReached: "لديك 6 ملفات بالفعل — احذف واحدًا لإضافة آخر.",
+    docsLimitTrimmed: "أمكن إضافة {n} ملف فقط (الحد الأقصى 6).",
+    docUnsupported: "{name}: غير مدعوم — استخدم JPEG أو PNG أو WebP أو PDF.",
+    docTooLarge: "{name}: أكبر من 20 ميجابايت — من فضلك اختر ملفًا أصغر.",
+    docsUploadFailed: "فشل رفع {n} مستند — لم يُفقد شيء، أرسل مرة أخرى.",
+    removeDoc: "حذف",
   },
 
   report: {
